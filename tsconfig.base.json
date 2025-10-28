@@ -16,6 +16,13 @@
     "skipLibCheck": true,
     "strict": true,
     "target": "es2022",
-    "customConditions": ["@flash-sale/source"]
+    "customConditions": ["@flash-sale/source"],
+    "baseUrl": ".",
+    "paths": {
+      "@shared/types": ["libs/shared-types/src/index.ts"],
+      "@shared/utils": ["libs/shared-utils/src/index.ts"],
+      "@shared/config": ["libs/shared-config/src/index.ts"],
+      "@shared/ui": ["libs/shared-ui/src/index.ts"]
+    }
   }
 }
