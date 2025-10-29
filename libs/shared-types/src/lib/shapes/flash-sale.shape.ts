@@ -7,10 +7,8 @@ export interface FlashSaleShape {
   description?: string;
   startsAt: Date;
   endsAt: Date;
-  inventory: {
-    current: number;
-    start: number;
-  };
+  currentQuantity: number;
+  startingQuantity: number;
   productId?: ObjectId;
   status: FlashSaleStatus;
   createdAt?: Date;

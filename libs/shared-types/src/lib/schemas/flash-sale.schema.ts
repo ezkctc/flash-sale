@@ -1,6 +1,7 @@
 import { model, Schema } from 'mongoose';
 
 import { FlashSaleShape } from '../shapes/index.js';
+import { FlashSaleStatus } from '../enums/index.js';
 
 /**
  * Represents a flash sale event.
@@ -16,13 +17,14 @@ export const flashSaleSchema = new Schema(
       trim: true,
       required: true,
       index: true,
+      default: 'product',
     },
 
     description: {
       type: String,
       trim: true,
       required: false,
-      default: '',
+      default: 'this is a test product',
     },
 
     // Start and end datetime for the sale window
@@ -30,10 +32,9 @@ export const flashSaleSchema = new Schema(
     endsAt: { type: Date, required: true, index: true },
 
     // Inventory tracking
-    inventory: {
-      current: { type: Number, required: true, default: 0 },
-      start: { type: Number, required: true, default: 0 },
-    },
+
+    currentQuantity: { type: Number, required: true, default: 0 },
+    startingQuantity: { type: Number, required: true, default: 0 },
 
     // Optional: product association or category
     productId: {
@@ -42,11 +43,10 @@ export const flashSaleSchema = new Schema(
       required: false,
     },
 
-    // Optional active flag
     status: {
       type: String,
-      enum: ['upcoming', 'active', 'ended', 'cancelled'],
-      default: 'upcoming',
+      enum: FlashSaleStatus,
+      default: FlashSaleStatus.OnSchedule,
       index: true,
     },
   },
