@@ -1,17 +1,38 @@
 import { betterAuth } from 'better-auth';
 import { mongodbAdapter } from 'better-auth/adapters/mongodb';
 import type { Db } from 'mongodb';
-import { env } from './env';
 
-// Factory to create a Better Auth instance using an existing MongoDB Db
-export function createAuth(db: Db) {
-  const selfOrigin = `http://${env.HOST}:${env.PORT}`;
+type CreateAuthOpts = {
+  db: Db;
+  apiOrigin: string;
+  clientOrigins: string[];
+  secureCookies?: boolean;
+};
+
+export function createAuth({
+  db,
+  apiOrigin,
+  clientOrigins,
+  secureCookies = false,
+}: CreateAuthOpts) {
   return betterAuth({
     database: mongodbAdapter(db),
-    emailAndPassword: {
-      enabled: true,
+
+    emailAndPassword: { enabled: true },
+
+    trustedOrigins: [apiOrigin, ...clientOrigins],
+
+    session: {
+      expiresIn: 30 * 24 * 60 * 60,
+      cookie: {
+        name: 'ba_session',
+        sameSite: 'lax',
+        secure: secureCookies,
+        httpOnly: true,
+        path: '/',
+      },
     },
-    // Allow local frontend and server-origin calls (e.g., seed scripts)
-    trustedOrigins: ['http://localhost:3000', selfOrigin],
   });
 }
+
+export type AuthInstance = ReturnType<typeof betterAuth>;

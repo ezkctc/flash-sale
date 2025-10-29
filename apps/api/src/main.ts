@@ -2,8 +2,8 @@ import Fastify from 'fastify';
 import { app } from './app/app';
 import { env } from './lib/env';
 
-const host = env.HOST;
-const port = env.PORT;
+const host = env.BEND_HOST;
+const port = env.BEND_PORT;
 
 (async () => {
   const server = Fastify({ logger: true });

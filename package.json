@@ -9,8 +9,7 @@
     "mongo:logs": "docker logs -f mongo",
     "dev:api": "nx serve @flash-sale/api",
     "dev": "npm run mongo:start && nx serve @flash-sale/api",
-    "seed": "tsx apps/api/src/seed.ts",
-    "seed:admin": "tsx apps/api/src/seed-admin.ts"
+    "seed": "tsx apps/api/src/seed.ts"
   },
   "private": true,
   "devDependencies": {

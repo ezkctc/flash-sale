@@ -100,8 +100,25 @@ export async function app(fastify: FastifyInstance, opts: AppOptions) {
   // Register routes explicitly to control structure (after swagger)
   integrateRoutes(fastify);
 
+  const selfOrigin = `http://${process.env.BEND_HOST}:${process.env.BEND_PORT}`;
+
+  const allowedOrigins = [
+    'http://localhost:3000',
+    'http://localhost:3001',
+    selfOrigin,
+  ];
+
   fastify.register(cors, {
-    origin: process.env.FEND_URL ?? 'http://localhost:3001',
+    origin: (origin, cb) => {
+      // If no origin (like curl or Postman), allow it
+      if (!origin) return cb(null, true);
+
+      if (allowedOrigins.includes(origin)) {
+        cb(null, true); // ✅ allow
+      } else {
+        cb(new Error('Not allowed by CORS'), false); // ❌ deny
+      }
+    },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   });

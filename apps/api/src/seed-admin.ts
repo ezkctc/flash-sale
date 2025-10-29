@@ -1,8 +1,8 @@
 import 'dotenv/config';
 
-const HOST = process.env.HOST ?? 'localhost';
-const PORT = process.env.PORT ? Number(process.env.PORT) : 4000;
-const BASE = `http://${HOST}:${PORT}`;
+const BEND_HOST = process.env.BEND_HOST ?? 'localhost';
+const BEND_PORT = process.env.BEND_PORT ? Number(process.env.BEND_PORT) : 4000;
+const BASE = `http://${BEND_HOST}:${BEND_PORT}`;
 
 async function main() {
   const email = 'admin@email.com';
@@ -15,7 +15,7 @@ async function main() {
       // Make origin check happy
       origin: BASE,
     } as any,
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify({ email, password, name: 'Admin' }),
   });
 
   if (!res.ok) {
@@ -31,4 +31,3 @@ main().catch((e) => {
   console.error(e);
   process.exit(1);
 });
-
