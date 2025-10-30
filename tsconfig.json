@@ -17,6 +17,12 @@
     },
     {
       "path": "./apps/worker"
+    },
+    {
+      "path": "./apps/admin-web"
+    },
+    {
+      "path": "./apps/site-web"
     }
   ]
 }

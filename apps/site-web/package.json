@@ -1,0 +1,47 @@
+{
+  "name": "@flash-sale/site-web",
+  "version": "0.0.1",
+  "private": true,
+  "nx": {
+    "targets": {
+      "build": {
+        "executor": "@nx/next:build",
+        "outputs": [
+          "{options.outputPath}"
+        ],
+        "defaultConfiguration": "production",
+        "options": {
+          "root": "apps/site-web",
+          "outputPath": "dist/apps/site-web"
+        },
+        "configurations": {
+          "development": {},
+          "production": {}
+        }
+      },
+      "serve": {
+        "executor": "@nx/next:server",
+        "defaultConfiguration": "development",
+        "options": {
+          "buildTarget": "@flash-sale/site-web:build",
+          "dev": true,
+          "port": 4201,
+          "hostname": "localhost"
+        },
+        "configurations": {
+          "development": {
+            "buildTarget": "@flash-sale/site-web:build:development"
+          },
+          "production": {
+            "buildTarget": "@flash-sale/site-web:build:production"
+          }
+        }
+      }
+    }
+  },
+  "dependencies": {
+    "next": "~15.2.4",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  }
+}

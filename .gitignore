@@ -46,3 +46,9 @@ Thumbs.db
 .design_notes.md
 .problem_statement.md
 .env
+
+# Next.js
+.next
+out
+
+

@@ -103,8 +103,8 @@ export async function app(fastify: FastifyInstance, opts: AppOptions) {
   const selfOrigin = `http://${process.env.BEND_HOST}:${process.env.BEND_PORT}`;
 
   const allowedOrigins = [
-    'http://localhost:3000',
-    'http://localhost:3001',
+    `http://${process.env.ADMIN_HOST}:${process.env.ADMIN_PORT}`,
+    `http://${process.env.FEND_HOST}:${process.env.FEND_PORT}`,
     selfOrigin,
   ];
 

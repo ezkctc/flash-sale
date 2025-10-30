@@ -1,0 +1,10 @@
+FROM node:20-alpine AS builder
+WORKDIR /app
+COPY . .
+RUN npx nx build site-web
+
+FROM node:20-alpine
+WORKDIR /app
+COPY --from=builder /app/dist/apps/site-web ./
+EXPOSE 3000
+CMD ["node", "server.js"]

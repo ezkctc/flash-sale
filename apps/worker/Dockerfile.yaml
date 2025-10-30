@@ -1,0 +1,24 @@
+# ---------- 1. Builder ----------
+FROM node:20-alpine AS builder
+WORKDIR /app
+
+# Copy all repo files
+COPY . .
+
+RUN npm ci
+
+# Build the worker (if it’s an Nx target)
+RUN npx nx build @flash-sale/worker
+
+# ---------- 2. Runtime ----------
+FROM node:20-alpine AS runner
+WORKDIR /app
+
+ENV NODE_ENV=production
+
+# Copy built worker code
+COPY --from=builder /app/dist/apps/worker ./dist
+COPY package*.json ./
+
+# Run the BullMQ worker
+CMD ["node", "dist/apps/worker/main.js"]

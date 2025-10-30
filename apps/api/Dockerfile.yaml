@@ -1,0 +1,30 @@
+# ---------- 1. Builder ----------
+FROM node:20-alpine AS builder
+WORKDIR /app
+
+# Copy monorepo files
+COPY . .
+
+# Install dependencies (use Nx cache if available)
+RUN npm ci
+
+# Build only the API app
+RUN npx nx build @flash-sale/api
+
+# ---------- 2. Runtime ----------
+FROM node:20-alpine AS runner
+WORKDIR /app
+
+ENV NODE_ENV=production
+ENV PORT=4300
+
+# Copy built app from builder
+COPY --from=builder /app/dist/apps/api ./dist
+# Copy package.json for runtime context (for possible runtime deps)
+COPY package*.json ./
+
+# Expose API port
+EXPOSE 4300
+
+# Run the Fastify app
+CMD ["node", "dist/apps/api/main.js"]
