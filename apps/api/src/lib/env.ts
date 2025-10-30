@@ -8,6 +8,10 @@ const schema = z.object({
   MONGO_DB: z.string().default('flashsale'),
   JWT_SECRET: z.string().default('local-secret'),
   REDIS_URL: z.string().default('redis://:redispass@localhost:6379'),
+  HOLD_TTL_SECONDS: z.preprocess(
+    (v) => (v === '' ? undefined : v),
+    z.coerce.number().int().min(1).default(900)
+  ),
 });
 
 function deriveFromMongoUrl(mongoUrl?: string) {

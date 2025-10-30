@@ -143,7 +143,6 @@ export function FlashSaleCard({
               '100%': '#87d068',
             }}
             trailColor="#f0f0f0"
-            strokeWidth={12}
             showInfo={false}
           />
           <div style={{ textAlign: 'center', marginTop: 8 }}>

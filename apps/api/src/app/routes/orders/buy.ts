@@ -57,14 +57,14 @@ export default async function (app: FastifyInstance) {
     ) {
       try {
         const { email, flashSaleId } = request.body;
-        
+
         // Validate required fields
         if (!email || !flashSaleId) {
-          return reply.code(400).send({ 
-            message: 'Email and flashSaleId are required' 
+          return reply.code(400).send({
+            message: 'Email and flashSaleId are required',
           });
         }
-        
+
         const nowMs = Date.now();
 
         // If user already has an active hold (worker already processed), inform them
