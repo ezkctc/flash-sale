@@ -13,6 +13,9 @@ const nextConfig = {
   env: {
     API_URL: `http://${process.env.BEND_HOST}:${process.env.BEND_PORT}`,
   },
+  typescript: {
+    ignoreBuildErrors: false, // keep false ideally
+  },
 };
 
 const plugins = [

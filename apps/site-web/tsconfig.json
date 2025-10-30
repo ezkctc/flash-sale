@@ -27,31 +27,23 @@
       "@/*": [
         "./src/*"
       ]
-    },
-    "outDir": "dist",
-    "rootDir": "src",
-    "tsBuildInfoFile": "dist/tsconfig.tsbuildinfo"
+    }
   },
   "include": [
-    "../../apps/site-web/.next/types/**/*.ts",
-    "../../dist/apps/site-web/.next/types/**/*.ts",
     "next-env.d.ts",
     "src/**/*.js",
     "src/**/*.jsx",
     "src/**/*.ts",
     "src/**/*.tsx",
-    ".next/types/**/*.ts"
+    "../../dist/apps/site-web/.next/types/**/*.ts"
   ],
   "exclude": [
-    "out-tsc",
-    "dist",
-    "node_modules",
-    "jest.config.ts",
-    "src/**/*.spec.ts",
-    "src/**/*.test.ts",
     ".next",
-    "eslint.config.js",
-    "eslint.config.cjs",
-    "eslint.config.mjs"
+    "dist",
+    "../../dist",
+    "**/*.spec.ts",
+    "**/*.spec.tsx",
+    "**/*.test.ts",
+    "node_modules"
   ]
 }

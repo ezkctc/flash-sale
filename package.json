@@ -8,6 +8,7 @@
     "infra:logs": "docker compose logs -f",
     "infra:ensure": "node scripts/ensure-infra.js",
     "build": "nx affected --target=build",
+    "build:all": "nx run-many --target=build --all --parallel=5",
     "dev:api": "nx serve @flash-sale/api",
     "dev:worker": "nx serve @flash-sale/worker",
     "dev:admin": "nx serve @flash-sale/admin-web",
