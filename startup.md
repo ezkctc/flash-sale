@@ -1,11 +1,34 @@
-# Startup
+# Local Development Setup
 
-## Initialize MongoDB
+This repo runs MongoDB and Redis locally via Docker Compose and serves:
+- Fastify API (Gatekeeper)
+- BullMQ Worker (Consumer)
 
-The project uses Better Auth with the MongoDB adapter, which does not require SQL schema generation or migrations.
+The Better Auth CLI schema steps are not applicable for MongoDB. Skip generate/migrate.
 
-- Ensure MongoDB is running (use `npm run mongo:start`).
-- Set `MONGODB_URI` and `MONGO_DB` in `.env` (see `env.sample`).
-- Start the API: `npm run dev:api` or `npm run dev`.
+## Prerequisites
+- Node.js + npm
+- Docker + Docker Compose
 
-Note: `@better-auth/cli generate` and `migrate` are only for SQL adapters (e.g., Drizzle/Prisma). They are not applicable for the MongoDB adapter and will error with “mongodb-adapter is not supported”.
+## 1) Start Infra (MongoDB + Redis)
+- `npm run infra:up`
+  - Redis: `redis://:redispass@localhost:6379`
+  - Mongo: `mongodb://root:example@localhost:27017/flash_sale_db?authSource=admin`
+
+## 2) Configure Environment
+- See `.env` / `env.sample` for:
+  - `MONGO_URL`, `MONGODB_URI`, `MONGO_DB`
+  - `REDIS_URL`
+  - `BEND_HOST`, `BEND_PORT`
+  - `QUEUE_NAME`
+
+## 3) Run Services
+- API (Gatekeeper): `npm run dev` (brings up infra then serves API)
+- Worker (Consumer): `npm run dev:worker`
+
+## 4) Seeding Admin User
+- `npm run seed:admin` (email: admin@email.com, password: admin)
+
+## Notes
+- Auth endpoints are under `/auth/*` and documented in `/docs` (Swagger).
+- Flash Sale CRUD routes require login.

@@ -18,7 +18,7 @@ export default async function (app: FastifyInstance) {
     {
       preHandler: authGuard(app),
       schema: {
-        tags: ['Flash Sales'],
+        tags: ['Flash Sales', 'Admin'],
         summary: 'Create flash sale',
         body: {
           type: 'object',

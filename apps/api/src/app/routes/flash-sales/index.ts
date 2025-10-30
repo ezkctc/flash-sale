@@ -5,7 +5,7 @@ import getByIdRoute from './get-by-id';
 import createRoute from './create';
 import updateRoute from './update';
 import deleteRoute from './delete';
-import publicNextRoute from './public-next';
+import publicSaleRoute from './public-sale';
 
 export const flashSalesRoutes = async (app: FastifyInstance) => {
   listRoute(app);
@@ -13,7 +13,7 @@ export const flashSalesRoutes = async (app: FastifyInstance) => {
   createRoute(app);
   updateRoute(app);
   deleteRoute(app);
-  publicNextRoute(app);
+  publicSaleRoute(app);
 };
 
 export default flashSalesRoutes;

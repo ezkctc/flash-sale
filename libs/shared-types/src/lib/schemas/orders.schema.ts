@@ -38,7 +38,8 @@ export const orderSchema = new Schema(
   }
 );
 
-// 👇 Export Mongoose model
+orderSchema.index({ userEmail: 1, flashSaleId: 1 }, { unique: true });
+
 export const orderMongoModel = model<OrderShape>(
   'orders',
   orderSchema,
