@@ -1,5 +1,5 @@
 import './global.css';
-import { AuthProvider } from '@/components/auth/auth-provider';
+import { AuthProvider } from '../components/auth/auth-provider';
 
 export const metadata = {
   title: 'Flash Sale Admin',

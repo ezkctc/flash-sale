@@ -1,4 +1,4 @@
-import { auth } from '@/lib/auth/auth-server';
+import { auth } from '../../../../lib/auth/auth-server';
 
 export async function GET(request: Request) {
   return auth.handler(request);

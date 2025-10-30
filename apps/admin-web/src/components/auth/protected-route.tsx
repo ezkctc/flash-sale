@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useSession } from '@/lib/auth/auth-client';
+import { useSession } from '../../lib/auth/auth-client';
 import { useRouter } from 'next/navigation';
 
 export function ProtectedRoute({ children }: { children: React.ReactNode }) {

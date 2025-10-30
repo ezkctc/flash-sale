@@ -1,8 +1,8 @@
 'use client';
 
-import { ProtectedRoute } from '@/components/auth/protected-route';
-import { LogoutButton } from '@/components/auth/logout-button';
-import { useSession } from '@/lib/auth/auth-client';
+import { ProtectedRoute } from '../../components/auth/protected-route';
+import { LogoutButton } from '../../components/auth/logout-button';
+import { useSession } from '../../lib/auth/auth-client';
 
 export default function DashboardPage() {
   const { data: session } = useSession();

@@ -1,8 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { LoginForm } from '@/components/auth/login-form';
-import { SignupForm } from '@/components/auth/signup-form';
+import { LoginForm } from '../../components/auth/login-form';
+import { SignupForm } from '../../components/auth/signup-form';
 import Link from 'next/link';
 
 export default function LoginPage() {

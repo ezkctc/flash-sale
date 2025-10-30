@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useSession } from '@/lib/auth/auth-client';
+import { useSession } from '../../lib/auth/auth-client';
 
 export default function Index() {
   const { data: session, isPending } = useSession();
