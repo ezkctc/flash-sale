@@ -18,8 +18,8 @@ interface FlashSaleCardProps {
   item: FlashSaleItem | null;
   meta: FlashSaleMeta;
   userEmail: string;
-  queueStatus: QueuePosition | null;
-  onBuy: (position: QueuePosition) => void;
+  queueStatus: any | null;
+  onBuy: (position: any) => void;
 }
 
 export function FlashSaleCard({
@@ -95,9 +95,10 @@ export function FlashSaleCard({
 
   // Determine if user should see buy button or is already in queue
   const isInQueue = queueStatus && queueStatus.size > 0;
-  const canPurchase = queueStatus && 
-    queueStatus.position && 
-    meta.progress && 
+  const canPurchase =
+    queueStatus &&
+    queueStatus.position &&
+    meta.progress &&
     queueStatus.position <= meta.progress.remaining;
 
   return (

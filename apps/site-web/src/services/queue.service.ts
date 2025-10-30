@@ -26,7 +26,11 @@ export const queueService = {
   /**
    * Confirm payment and complete purchase
    */
-  confirmPayment: (email: string, flashSaleId: string, totalAmount: number = 1): Promise<ConfirmPaymentResponse> => {
+  confirmPayment: (
+    email: string,
+    flashSaleId: string,
+    totalAmount = 1
+  ): Promise<ConfirmPaymentResponse> => {
     return apiService.post<ConfirmPaymentResponse>('/orders/confirm', {
       email,
       flashSaleId,

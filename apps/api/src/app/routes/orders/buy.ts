@@ -5,19 +5,14 @@ import IORedis from 'ioredis';
 const QUEUE_NAME = process.env.QUEUE_NAME ?? 'sale-processing-queue';
 const REDIS_URL = process.env.REDIS_URL ?? 'redis://:redispass@localhost:6379';
 
-// redis keys
-const zsetKey = (flashSaleId: string) => `fsq:${flashSaleId}`; // sorted set line
+const zsetKey = (flashSaleId: string) => `fsq:${flashSaleId}`;
 const holdKey = (flashSaleId: string, email: string) =>
-  `fsh:${flashSaleId}:${email}`; // TTL hold (set by worker)
-const HOLD_TTL_SECONDS = Number(process.env.HOLD_TTL_SECONDS ?? 900); // 15 mins
+  `fsh:${flashSaleId}:${email}`;
+const HOLD_TTL_SECONDS = Number(process.env.HOLD_TTL_SECONDS ?? 900);
 
-type BuyBody = {
-  email: string;
-  flashSaleId: string;
-};
+type BuyBody = { email: string; flashSaleId: string };
 
 export default async function (app: FastifyInstance) {
-  // share redis + queue (simple singletons per process)
   const redis = new IORedis(REDIS_URL);
   const queue = new Queue(QUEUE_NAME, { connection: { url: REDIS_URL } });
 
@@ -56,22 +51,32 @@ export default async function (app: FastifyInstance) {
       reply: FastifyReply
     ) {
       try {
-        const { email, flashSaleId } = request.body;
+        const rawEmail = request.body.email;
+        const flashSaleId = request.body.flashSaleId;
 
-        // Validate required fields
-        if (!email || !flashSaleId) {
-          return reply.code(400).send({
-            message: 'Email and flashSaleId are required',
-          });
+        if (!rawEmail || !flashSaleId) {
+          return reply
+            .code(400)
+            .send({ message: 'Email and flashSaleId are required' });
         }
 
+        // Normalize to match worker’s keying convention (avoid mismatched keys)
+        const email = rawEmail.trim().toLowerCase();
+
+        // Check hold TTL precisely (ms) and convert to seconds
+        const key = holdKey(flashSaleId, email);
+        let pttl = await redis.pttl(key); // ms
+        // pttl semantics: -2 = key does not exist; -1 = no expire; >=0 = ms remaining
+        const hasActiveHold = pttl > 0 || pttl === -1;
+        const holdTtlSec =
+          pttl > 0
+            ? Math.ceil(pttl / 1000) // avoid 0 when <1s remains
+            : pttl === -1
+            ? HOLD_TTL_SECONDS // fallback if worker forgot EX—treat as full window
+            : 0; // no key
+
+        // Enqueue work for the worker to grant/set the hold
         const nowMs = Date.now();
-
-        // If user already has an active hold (worker already processed), inform them
-        const ttlRemaining = await redis.ttl(holdKey(flashSaleId, email));
-        const hasActiveHold = ttlRemaining > 0;
-
-        // Add to queue (FIFO fairness is enforced by BullMQ workers)
         const job = await queue.add(
           'reserve',
           {
@@ -83,32 +88,30 @@ export default async function (app: FastifyInstance) {
           { removeOnComplete: true, removeOnFail: true }
         );
 
-        // Track visible position immediately (UX): add to ZSET with score = now
-        // Only add if not already present (NX semantics via ZADD with XX/NX is not in ioredis helper, so do a check)
-        const alreadyIn = await redis.zrank(zsetKey(flashSaleId), email);
+        // Track visible position in a ZSET (score = enqueue time)
+        const qKey = zsetKey(flashSaleId);
+        const alreadyIn = await redis.zrank(qKey, email);
         if (alreadyIn === null) {
-          await redis.zadd(zsetKey(flashSaleId), nowMs, email);
+          await redis.zadd(qKey, nowMs, email);
         }
+        const rank = await redis.zrank(qKey, email);
+        const size = await redis.zcard(qKey);
 
-        const rank = await redis.zrank(zsetKey(flashSaleId), email);
-        const size = await redis.zcard(zsetKey(flashSaleId));
-
-        reply.code(200).send({
+        return reply.code(200).send({
           queued: true,
-          position: (rank ?? 0) + 1, // 1-based
+          position: (rank ?? 0) + 1,
           size,
           hasActiveHold,
-          holdTtlSec: hasActiveHold ? ttlRemaining : 0,
+          holdTtlSec,
           jobId: String(job.id),
         });
       } catch (error) {
         request.log.error(error);
-        reply.code(500).send({ message: 'Failed to enqueue order' });
+        return reply.code(500).send({ message: 'Failed to enqueue order' });
       }
     }
   );
 
-  // graceful shutdown hooks (optional)
   app.addHook('onClose', async () => {
     await queue.close();
     await redis.quit();
