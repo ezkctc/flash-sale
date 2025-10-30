@@ -61,14 +61,17 @@ export function FlashSalePage() {
     setLoading(true);
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
-      console.log('Fetching flash sale from:', `${apiUrl}/flash-sales/public/sale`);
-      
+      console.log(
+        'Fetching flash sale from:',
+        `${apiUrl}/flash-sales/public/sale`
+      );
+
       const response = await fetch(`${apiUrl}/flash-sales/public/sale`);
-      
+
       if (!response.ok) {
         throw new Error('Failed to fetch flash sale');
       }
-      
+
       const data: FlashSaleResponse = await response.json();
       console.log('Flash sale data received:', data);
       setFlashSale(data);
@@ -121,12 +124,10 @@ export function FlashSalePage() {
         <Title level={2} style={{ color: 'white', margin: 0 }}>
           ⚡ Flash Sale
         </Title>
-        
+
         <Space>
           {userEmail && (
-            <Text style={{ color: 'rgba(255,255,255,0.9)' }}>
-              {userEmail}
-            </Text>
+            <Text style={{ color: 'rgba(255,255,255,0.9)' }}>{userEmail}</Text>
           )}
           <Button
             icon={<ReloadOutlined />}
@@ -155,9 +156,16 @@ export function FlashSalePage() {
         </Space>
       </Header>
 
-      <Content style={{ padding: '24px', maxWidth: 800, margin: '0 auto', width: '100%' }}>
+      <Content
+        style={{
+          padding: '24px',
+          maxWidth: 800,
+          margin: '0 auto',
+          width: '100%',
+        }}
+      >
         <EmailPrompt open={showEmailPrompt} onSubmit={handleEmailSubmit} />
-        
+
         {userEmail && (
           <Space direction="vertical" size="large" style={{ width: '100%' }}>
             {loading && !flashSale ? (
@@ -170,12 +178,13 @@ export function FlashSalePage() {
             ) : flashSale ? (
               <>
                 {/* Show countdown if upcoming */}
-                {flashSale.meta.status === 'upcoming' && flashSale.meta.startsAt && (
-                  <CountdownTimer
-                    targetDate={flashSale.meta.startsAt}
-                    title="Sale Starts In"
-                  />
-                )}
+                {flashSale.meta.status === 'upcoming' &&
+                  flashSale.meta.startsAt && (
+                    <CountdownTimer
+                      targetDate={flashSale.meta.startsAt}
+                      title="Sale Starts In"
+                    />
+                  )}
 
                 {/* Show flash sale card */}
                 <FlashSaleCard
@@ -196,7 +205,9 @@ export function FlashSalePage() {
             ) : (
               <Card style={{ textAlign: 'center', padding: 40 }}>
                 <Title level={3}>No Flash Sale Available</Title>
-                <Text type="secondary">Check back later for exciting deals!</Text>
+                <Text type="secondary">
+                  Check back later for exciting deals!
+                </Text>
               </Card>
             )}
           </Space>

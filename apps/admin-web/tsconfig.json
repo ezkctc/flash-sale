@@ -30,12 +30,13 @@
     }
   },
   "include": [
+    "../../dist/apps/admin-web/.next/types/**/*.ts",
     "next-env.d.ts",
     "src/**/*.js",
     "src/**/*.jsx",
     "src/**/*.ts",
     "src/**/*.tsx",
-    "../../dist/apps/admin-web/.next/types/**/*.ts"
+    ".next/types/**/*.ts"
   ],
   "exclude": [
     ".next",

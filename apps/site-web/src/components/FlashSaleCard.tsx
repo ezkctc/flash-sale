@@ -2,7 +2,11 @@
 
 import React, { useState } from 'react';
 import { Card, Button, Progress, Typography, Space, Tag, Spin } from 'antd';
-import { ShoppingCartOutlined, FireOutlined, CheckCircleOutlined } from '@ant-design/icons';
+import {
+  ShoppingCartOutlined,
+  FireOutlined,
+  CheckCircleOutlined,
+} from '@ant-design/icons';
 import { toast } from 'react-toastify';
 
 const { Title, Text } = Typography;
@@ -36,7 +40,12 @@ interface FlashSaleCardProps {
   onBuy: () => void;
 }
 
-export function FlashSaleCard({ item, meta, userEmail, onBuy }: FlashSaleCardProps) {
+export function FlashSaleCard({
+  item,
+  meta,
+  userEmail,
+  onBuy,
+}: FlashSaleCardProps) {
   const [buying, setBuying] = useState(false);
 
   if (!item) {
@@ -52,12 +61,12 @@ export function FlashSaleCard({ item, meta, userEmail, onBuy }: FlashSaleCardPro
     setBuying(true);
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
-      
+
       console.log('Sending buy request:', {
         email: userEmail,
         flashSaleId: item._id,
       });
-      
+
       const response = await fetch(`${apiUrl}/orders/buy`, {
         method: 'POST',
         headers: {
@@ -73,7 +82,7 @@ export function FlashSaleCard({ item, meta, userEmail, onBuy }: FlashSaleCardPro
         let errorMessage = 'Failed to place order';
         try {
           const errorData = await response.json();
-          errorMessage = errorData.message || errorText;
+          errorMessage = errorData.message;
         } catch {
           const errorText = await response.text();
           errorMessage = errorText || errorMessage;
@@ -82,13 +91,19 @@ export function FlashSaleCard({ item, meta, userEmail, onBuy }: FlashSaleCardPro
       }
 
       const result = await response.json();
-      
+
       if (result.hasActiveHold) {
-        toast.success(`You already have a reservation! Hold expires in ${Math.floor(result.holdTtlSec / 60)} minutes.`);
+        toast.success(
+          `You already have a reservation! Hold expires in ${Math.floor(
+            result.holdTtlSec / 60
+          )} minutes.`
+        );
       } else {
-        toast.success(`Added to queue! You are position #${result.position} of ${result.size}`);
+        toast.success(
+          `Added to queue! You are position #${result.position} of ${result.size}`
+        );
       }
-      
+
       onBuy();
     } catch (error: any) {
       console.error('Buy request failed:', error);
@@ -101,7 +116,11 @@ export function FlashSaleCard({ item, meta, userEmail, onBuy }: FlashSaleCardPro
   const getStatusTag = () => {
     switch (meta.status) {
       case 'ongoing':
-        return <Tag color="green" icon={<FireOutlined />}>LIVE NOW</Tag>;
+        return (
+          <Tag color="green" icon={<FireOutlined />}>
+            LIVE NOW
+          </Tag>
+        );
       case 'upcoming':
         return <Tag color="blue">UPCOMING</Tag>;
       case 'ended':
@@ -111,11 +130,11 @@ export function FlashSaleCard({ item, meta, userEmail, onBuy }: FlashSaleCardPro
     }
   };
 
-  const progressPercent = meta.progress 
+  const progressPercent = meta.progress
     ? Math.round((1 - meta.progress.ratio) * 100)
     : 0;
 
-  const soldCount = meta.progress 
+  const soldCount = meta.progress
     ? meta.progress.starting - meta.progress.remaining
     : 0;
 
@@ -143,7 +162,13 @@ export function FlashSaleCard({ item, meta, userEmail, onBuy }: FlashSaleCardPro
 
       {meta.progress && (
         <div style={{ marginBottom: 24 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              marginBottom: 8,
+            }}
+          >
             <Text strong>Progress</Text>
             <Text>
               {soldCount} / {meta.progress.starting} sold
@@ -160,9 +185,7 @@ export function FlashSaleCard({ item, meta, userEmail, onBuy }: FlashSaleCardPro
             showInfo={false}
           />
           <div style={{ textAlign: 'center', marginTop: 8 }}>
-            <Text type="secondary">
-              {meta.progress.remaining} remaining
-            </Text>
+            <Text type="secondary">{meta.progress.remaining} remaining</Text>
           </div>
         </div>
       )}

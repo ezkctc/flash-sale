@@ -46,34 +46,6 @@ export default async function (app: FastifyInstance) {
             flashSaleId: { type: 'string' },
           },
         },
-        response: {
-          200: {
-            type: 'object',
-            properties: {
-              item: { type: 'object', nullable: true },
-              meta: {
-                type: 'object',
-                properties: {
-                  status: { type: 'string' }, // ongoing | upcoming | ended | not_found
-                  soldOut: { type: 'boolean', nullable: true },
-                  progress: {
-                    type: 'object',
-                    nullable: true,
-                    properties: {
-                      remaining: { type: 'number' },
-                      starting: { type: 'number' },
-                      ratio: { type: 'number' },
-                    },
-                  },
-                  startsAt: { type: 'string', nullable: true },
-                  endsAt: { type: 'string', nullable: true },
-                },
-                required: ['status'],
-              },
-            },
-            required: ['item', 'meta'],
-          },
-        },
       },
     },
     async function (
@@ -84,44 +56,29 @@ export default async function (app: FastifyInstance) {
         const now = new Date();
         const { flashSaleId } = request.query;
 
-        // Fields we actually need for status
-        const projection = {
-          name: 1,
-          description: 1,
-          startsAt: 1,
-          endsAt: 1,
-          currentQuantity: 1,
-          startingQuantity: 1,
-          status: 1,
-          productId: 1,
-        } as const;
-
         let item: any = null;
 
         if (flashSaleId) {
-          item = await flashSaleMongoModel
-            .findById(flashSaleId, projection)
-            .lean();
+          item = await flashSaleMongoModel.findById(flashSaleId).lean();
           const meta = computeStatus(item, now);
           return reply.code(200).send({ item, meta });
         }
 
         // No id provided → current first, else next upcoming (your original logic)
-        item =
-          (await flashSaleMongoModel
-            .findOne(
-              { startsAt: { $lte: now }, endsAt: { $gte: now } },
-              projection
-            )
-            .sort({ startsAt: 1 })
-            .lean()) || null;
+        item = await flashSaleMongoModel
+          .findOne({
+            startsAt: { $lte: now },
+            endsAt: { $gte: now },
+            status: 'OnSchedule',
+          })
+          .sort({ startsAt: 1 })
+          .lean();
 
         if (!item) {
-          item =
-            (await flashSaleMongoModel
-              .findOne({ startsAt: { $gt: now } }, projection)
-              .sort({ startsAt: 1 })
-              .lean()) || null;
+          item = await flashSaleMongoModel
+            .findOne({ startsAt: { $gt: now }, status: 'OnSchedule' })
+            .sort({ startsAt: 1 })
+            .lean();
         }
 
         const meta = computeStatus(item, now);
