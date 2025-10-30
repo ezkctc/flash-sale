@@ -61,6 +61,8 @@ export function FlashSalePage() {
     setLoading(true);
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+      console.log('Fetching flash sale from:', `${apiUrl}/flash-sales/public/sale`);
+      
       const response = await fetch(`${apiUrl}/flash-sales/public/sale`);
       
       if (!response.ok) {
@@ -68,6 +70,7 @@ export function FlashSalePage() {
       }
       
       const data: FlashSaleResponse = await response.json();
+      console.log('Flash sale data received:', data);
       setFlashSale(data);
     } catch (error: any) {
       console.error('Flash sale fetch error:', error);

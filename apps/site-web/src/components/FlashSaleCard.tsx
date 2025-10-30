@@ -52,6 +52,12 @@ export function FlashSaleCard({ item, meta, userEmail, onBuy }: FlashSaleCardPro
     setBuying(true);
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+      
+      console.log('Sending buy request:', {
+        email: userEmail,
+        flashSaleId: item._id,
+      });
+      
       const response = await fetch(`${apiUrl}/orders/buy`, {
         method: 'POST',
         headers: {
@@ -64,8 +70,15 @@ export function FlashSaleCard({ item, meta, userEmail, onBuy }: FlashSaleCardPro
       });
 
       if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(errorText || 'Failed to place order');
+        let errorMessage = 'Failed to place order';
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.message || errorText;
+        } catch {
+          const errorText = await response.text();
+          errorMessage = errorText || errorMessage;
+        }
+        throw new Error(errorMessage);
       }
 
       const result = await response.json();
@@ -78,6 +91,7 @@ export function FlashSaleCard({ item, meta, userEmail, onBuy }: FlashSaleCardPro
       
       onBuy();
     } catch (error: any) {
+      console.error('Buy request failed:', error);
       toast.error(error.message || 'Failed to place order');
     } finally {
       setBuying(false);
