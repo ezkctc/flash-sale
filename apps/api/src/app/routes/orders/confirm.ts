@@ -9,6 +9,9 @@ const zsetKey = (flashSaleId: string) => `fsq:${flashSaleId}`;
 const holdKey = (flashSaleId: string, email: string) =>
   `fsh:${flashSaleId}:${email}`;
 
+// Included for standard file structure, though only buy.ts/position.ts use it
+const HOLD_TTL_SECONDS = Number(process.env.HOLD_TTL_SECONDS ?? 900); // 15 mins
+
 type ConfirmBody = {
   email: string;
   flashSaleId: string; // string ObjectId fine for Mongoose
@@ -40,7 +43,7 @@ export default async function (app: FastifyInstance) {
             properties: {
               ok: { type: 'boolean' },
               orderId: { type: 'string' },
-              inventoryLeft: { type: 'number' },
+              inventoryLeft: { type: 'number', nullable: true },
             },
             required: ['ok', 'orderId'],
           },
@@ -52,28 +55,26 @@ export default async function (app: FastifyInstance) {
       reply: FastifyReply
     ) => {
       const session = await mongoose.startSession();
+      session.startTransaction();
+
       try {
         const email = request.body.email?.trim().toLowerCase();
         const flashSaleId = request.body.flashSaleId;
         const totalAmount = request.body.totalAmount ?? 0;
-
-        if (!email || !flashSaleId) {
-          return reply
-            .code(400)
-            .send({ message: 'Email and flashSaleId are required' });
-        }
-
-        // Must have an active hold
-        const pttl = await redis.pttl(holdKey(flashSaleId, email));
-        if (pttl <= 0 && pttl !== -1) {
-          return reply.code(409).send({ message: 'Hold expired or not found' });
-        }
-
         const now = new Date();
 
-        // Atomically decrement inventory with guards (status/time/qty)
-        session.startTransaction();
+        // 1. Check for Active Hold (Redis TTL key existence)
+        const pttl = await redis.pttl(holdKey(flashSaleId, email));
+        const holdExists = pttl > 0;
 
+        if (!holdExists) {
+          await session.abortTransaction();
+          return reply
+            .code(403)
+            .send({ message: 'No active hold found or hold has expired' });
+        }
+
+        // 2. Decrement Inventory (MongoDB transaction)
         const updated = await flashSaleMongoModel.findOneAndUpdate(
           {
             _id: flashSaleId,
@@ -100,7 +101,7 @@ export default async function (app: FastifyInstance) {
               email,
               flashSaleId,
               totalAmount,
-              status: 'paid', // or 'confirmed'
+              paymentStatus: 'paid',
               createdAt: now,
               updatedAt: now,
             },
@@ -110,7 +111,7 @@ export default async function (app: FastifyInstance) {
 
         await session.commitTransaction();
 
-        // Cleanup: delete hold and visible queue entry
+        // 3. Cleanup: delete hold and visible queue entry
         await Promise.all([
           redis.del(holdKey(flashSaleId, email)),
           redis.zrem(zsetKey(flashSaleId), email),
@@ -125,8 +126,6 @@ export default async function (app: FastifyInstance) {
         await session.abortTransaction().catch(() => {});
         request.log.error(err);
         return reply.code(500).send({ message: 'Failed to confirm order' });
-      } finally {
-        session.endSession();
       }
     }
   );

@@ -11,6 +11,9 @@ const MONGODB_URI =
   'mongodb://root:example@localhost:27017/flash_sale_db?authSource=admin';
 const QUEUE_NAME = process.env.QUEUE_NAME ?? 'sale-processing-queue';
 
+// Use environment variable for the hold duration, defaulting to 15 minutes (900 seconds)
+const HOLD_TTL_SECONDS = Number(process.env.HOLD_TTL_SECONDS ?? 900);
+
 const holdKey = (saleId: string, email: string) => `fsh:${saleId}:${email}`;
 const zsetKey = (saleId: string) => `fsq:${saleId}`;
 const saleCacheKey = (saleId: string) => `fsmeta:${saleId}`; // optional meta cache
@@ -35,28 +38,30 @@ async function bootstrap() {
         flashSaleId: string;
         holdTtlSec: number;
       };
-
-      const email = rawEmail?.trim().toLowerCase();
-      if (!email || !flashSaleId) {
-        throw new Error('Missing email or flashSaleId');
-      }
-
-      // Validate sale window & status (read-through cache -> Mongo)
+      const email = rawEmail.trim().toLowerCase();
       const now = new Date();
-      let saleMeta: any | null = null;
-      const cached = await redis.get(saleCacheKey(flashSaleId));
-      if (cached) {
-        try {
-          saleMeta = JSON.parse(cached);
-        } catch {}
-      }
+
+      // 1. Check sale status and inventory (use a brief Redis cache)
+      let saleMeta = JSON.parse(
+        (await redis.get(saleCacheKey(flashSaleId))) ?? 'null'
+      );
+
       if (!saleMeta) {
         saleMeta = await flashSaleMongoModel
-          .findById(flashSaleId, { startsAt: 1, endsAt: 1, status: 1 })
-          .lean()
-          .exec();
-        if (!saleMeta) throw new Error('Flash sale not found');
-        // cache briefly (30s)
+          .findById(flashSaleId, {
+            status: 1,
+            startsAt: 1,
+            endsAt: 1,
+            currentQuantity: 1,
+          })
+          .lean();
+
+        if (!saleMeta) {
+          await redis.zrem(zsetKey(flashSaleId), email);
+          throw new Error('Flash sale not found');
+        }
+
+        // Cache the metadata for a short time (e.g., 30 seconds)
         await redis.set(
           saleCacheKey(flashSaleId),
           JSON.stringify(saleMeta),
@@ -70,24 +75,25 @@ async function bootstrap() {
         new Date(saleMeta.startsAt) <= now &&
         now < new Date(saleMeta.endsAt);
 
-      if (!isActive) {
-        // Just drop from the visible queue and exit; API will reflect position shrink on next poll
-        await redis.zrem(zsetKey(flashSaleId), email);
-        throw new Error('Flash sale not active');
+      // Enforce FIFO: proceed only if this user is at the head of the queue
+      const rank = await redis.zrank(zsetKey(flashSaleId), email);
+      const isFirst = rank === 0;
+
+      if (!isActive || saleMeta.currentQuantity <= 0 || !isFirst) {
+        // Not ready yet (window not active, sold out, or not first). Keep user in the visible queue.
+        // No hold is set; simply return to allow retry via subsequent triggers.
+        return { ok: false, reason: 'not_ready' } as any;
       }
 
-      // Set/refresh the hold (EX in seconds). Only mark the hold; do NOT decrement inventory here.
-      await redis.set(
-        holdKey(flashSaleId, email),
-        '1',
-        'EX',
-        Math.max(1, Number(holdTtlSec) || 900)
-      );
+      // 2. SUCCESS: Set/refresh the hold with an expiration, then remove from queue.
+      const holdTime = Math.max(1, Number(holdTtlSec) || HOLD_TTL_SECONDS);
+      const multi = redis.multi();
+      multi.set(holdKey(flashSaleId, email), '1', 'EX', holdTime);
+      multi.zrem(zsetKey(flashSaleId), email);
+      await multi.exec();
 
-      // Remove user from visible queue ZSET after worker processed their turn
-      await redis.zrem(zsetKey(flashSaleId), email);
-
-      return { ok: true };
+      // The job completes successfully, and the user now has a time-limited hold.
+      return { ok: true, holdTime: holdTime };
     },
     { connection: { url: REDIS_URL }, concurrency: 8 }
   );
@@ -105,11 +111,9 @@ async function bootstrap() {
     await mongoose.disconnect();
     process.exit(0);
   };
+
   process.on('SIGINT', shutdown);
   process.on('SIGTERM', shutdown);
 }
 
-bootstrap().catch((e) => {
-  console.error('[worker] fatal', e);
-  process.exit(1);
-});
+bootstrap().catch(console.error);

@@ -9,7 +9,7 @@ const REDIS_URL = process.env.REDIS_URL ?? 'redis://:redispass@localhost:6379';
 const zsetKey = (flashSaleId: string) => `fsq:${flashSaleId}`; // visible queue
 const holdKey = (flashSaleId: string, email: string) =>
   `fsh:${flashSaleId}:${email}`; // TTL hold (worker sets)
-const HOLD_TTL_SECONDS = Number(process.env.HOLD_TTL_SECONDS ?? 900); // 15 mins
+export const HOLD_TTL_SECONDS = Number(process.env.HOLD_TTL_SECONDS ?? 900); // 15 mins
 
 type BuyBody = { email: string; flashSaleId: string };
 
@@ -42,7 +42,13 @@ export default async function (app: FastifyInstance) {
               holdTtlSec: { type: 'number' },
               jobId: { type: 'string' },
             },
-            required: ['queued', 'position', 'size', 'hasActiveHold'],
+            required: [
+              'queued',
+              'position',
+              'size',
+              'hasActiveHold',
+              'holdTtlSec',
+            ],
           },
         },
       },
@@ -59,27 +65,34 @@ export default async function (app: FastifyInstance) {
 
         const nowMs = Date.now();
 
-        // Check existing hold precisely (ms), then ceil to seconds for UX
-        const pttl = await redis.pttl(holdKey(flashSaleId, email)); // -2 no key, -1 no expire, >=0 ms
-        const hasActiveHold = pttl > 0 || pttl === -1;
-        const holdTtlSec =
-          pttl > 0
-            ? Math.ceil(pttl / 1000)
-            : pttl === -1
-            ? HOLD_TTL_SECONDS
-            : 0;
+        // Check hold status precisely (ms). pttl returns: > 0 (ms), -1 (no expire), -2 (not found)
+        const pttl = await redis.pttl(holdKey(flashSaleId, email));
+
+        // --- Calculate Hold Status and TTL for response ---
+        let holdTtlSec = 0;
+        let hasActiveHold = false;
+        if (pttl > 0) {
+          hasActiveHold = true;
+          holdTtlSec = Math.ceil(pttl / 1000);
+        }
+        // Note: If pttl is -1 (stale hold with no expiration set) or 0 (just expired), hasActiveHold remains false and holdTtlSec remains 0.
+        // Given the worker sets 'EX', pttl should generally only be > 0 or -2 after the job runs.
 
         // Enqueue reserve job (worker will validate and set/refresh the hold)
-        const job = await queue.add(
-          'reserve',
-          {
-            email,
-            flashSaleId,
-            enqueuedAt: nowMs,
-            holdTtlSec: HOLD_TTL_SECONDS,
-          },
-          { removeOnComplete: true, removeOnFail: true }
-        );
+        // Idempotent job id per (sale,email)
+        const jobId = `${flashSaleId}:${email}:reserve`;
+        const job = await queue
+          .add(
+            'reserve',
+            {
+              email,
+              flashSaleId,
+              enqueuedAt: nowMs,
+              holdTtlSec: HOLD_TTL_SECONDS,
+            },
+            { jobId, removeOnComplete: true, removeOnFail: true }
+          )
+          .catch(() => null);
 
         // Track visible position in ZSET (score = enqueue time); add if not present
         const qKey = zsetKey(flashSaleId);
@@ -98,7 +111,7 @@ export default async function (app: FastifyInstance) {
           size,
           hasActiveHold,
           holdTtlSec,
-          jobId: String(job.id),
+          jobId: job ? String(job.id) : jobId,
         });
       } catch (err) {
         request.log.error(err);
