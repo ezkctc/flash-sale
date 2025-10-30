@@ -4,6 +4,10 @@ import React, { useState, useEffect } from 'react';
 import { Layout, Typography, Space, Button, Card, Spin } from 'antd';
 import { ReloadOutlined } from '@ant-design/icons';
 import { toast } from 'react-toastify';
+
+import type { FlashSaleResponse } from '@/types';
+import { flashSaleService } from '@/services';
+import { storageUtil } from '@/utils';
 import { EmailPrompt } from './EmailPrompt';
 import { CountdownTimer } from './CountdownTimer';
 import { FlashSaleCard } from './FlashSaleCard';
@@ -11,33 +15,6 @@ import { QueueStatus } from './QueueStatus';
 
 const { Content, Header } = Layout;
 const { Title, Text } = Typography;
-
-interface FlashSaleItem {
-  _id: string;
-  name: string;
-  description?: string;
-  startsAt: string;
-  endsAt: string;
-  currentQuantity: number;
-  startingQuantity: number;
-}
-
-interface FlashSaleMeta {
-  status: 'ongoing' | 'upcoming' | 'ended' | 'not_found';
-  soldOut: boolean;
-  progress?: {
-    remaining: number;
-    starting: number;
-    ratio: number;
-  };
-  startsAt?: string;
-  endsAt?: string;
-}
-
-interface FlashSaleResponse {
-  item: FlashSaleItem | null;
-  meta: FlashSaleMeta;
-}
 
 export function FlashSalePage() {
   const [userEmail, setUserEmail] = useState<string>('');
@@ -48,7 +25,7 @@ export function FlashSalePage() {
 
   // Check for saved email on mount
   useEffect(() => {
-    const savedEmail = localStorage.getItem('user_email');
+    const savedEmail = storageUtil.getUserEmail();
     if (savedEmail) {
       setUserEmail(savedEmail);
     } else {
@@ -60,23 +37,9 @@ export function FlashSalePage() {
   const fetchFlashSale = async () => {
     setLoading(true);
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
-      console.log(
-        'Fetching flash sale from:',
-        `${apiUrl}/flash-sales/public/sale`
-      );
-
-      const response = await fetch(`${apiUrl}/flash-sales/public/sale`);
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch flash sale');
-      }
-
-      const data: FlashSaleResponse = await response.json();
-      console.log('Flash sale data received:', data);
+      const data = await flashSaleService.getCurrentSale();
       setFlashSale(data);
     } catch (error: any) {
-      console.error('Flash sale fetch error:', error);
       toast.error(error.message || 'Failed to load flash sale');
     } finally {
       setLoading(false);
@@ -94,7 +57,7 @@ export function FlashSalePage() {
 
   const handleEmailSubmit = (email: string) => {
     setUserEmail(email);
-    localStorage.setItem('user_email', email);
+    storageUtil.setUserEmail(email);
     setShowEmailPrompt(false);
     toast.success('Welcome! Loading flash sales...');
   };
@@ -104,7 +67,7 @@ export function FlashSalePage() {
   };
 
   const clearEmail = () => {
-    localStorage.removeItem('user_email');
+    storageUtil.clearUserEmail();
     setUserEmail('');
     setInQueue(false);
     setShowEmailPrompt(true);

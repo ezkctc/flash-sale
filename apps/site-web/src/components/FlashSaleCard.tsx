@@ -9,29 +9,10 @@ import {
 } from '@ant-design/icons';
 import { toast } from 'react-toastify';
 
+import type { FlashSaleItem, FlashSaleMeta } from '@/types';
+import { queueService } from '@/services';
+
 const { Title, Text } = Typography;
-
-interface FlashSaleItem {
-  _id: string;
-  name: string;
-  description?: string;
-  startsAt: string;
-  endsAt: string;
-  currentQuantity: number;
-  startingQuantity: number;
-}
-
-interface FlashSaleMeta {
-  status: 'ongoing' | 'upcoming' | 'ended' | 'not_found';
-  soldOut: boolean;
-  progress?: {
-    remaining: number;
-    starting: number;
-    ratio: number;
-  };
-  startsAt?: string;
-  endsAt?: string;
-}
 
 interface FlashSaleCardProps {
   item: FlashSaleItem | null;
@@ -60,37 +41,10 @@ export function FlashSaleCard({
   const handleBuy = async () => {
     setBuying(true);
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
-
-      console.log('Sending buy request:', {
+      const result = await queueService.buyItem({
         email: userEmail,
         flashSaleId: item._id,
       });
-
-      const response = await fetch(`${apiUrl}/orders/buy`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          email: userEmail,
-          flashSaleId: item._id,
-        }),
-      });
-
-      if (!response.ok) {
-        let errorMessage = 'Failed to place order';
-        try {
-          const errorData = await response.json();
-          errorMessage = errorData.message;
-        } catch {
-          const errorText = await response.text();
-          errorMessage = errorText || errorMessage;
-        }
-        throw new Error(errorMessage);
-      }
-
-      const result = await response.json();
 
       if (result.hasActiveHold) {
         toast.success(
@@ -106,7 +60,6 @@ export function FlashSaleCard({
 
       onBuy();
     } catch (error: any) {
-      console.error('Buy request failed:', error);
       toast.error(error.message || 'Failed to place order');
     } finally {
       setBuying(false);

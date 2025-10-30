@@ -4,6 +4,8 @@ import React, { useState, useEffect } from 'react';
 import { Card, Statistic, Row, Col, Typography } from 'antd';
 import { ClockCircleOutlined } from '@ant-design/icons';
 
+import { timeUtil, type TimeLeft } from '@/utils';
+
 const { Title } = Typography;
 
 interface CountdownTimerProps {
@@ -12,7 +14,7 @@ interface CountdownTimerProps {
 }
 
 export function CountdownTimer({ targetDate, title }: CountdownTimerProps) {
-  const [timeLeft, setTimeLeft] = useState({
+  const [timeLeft, setTimeLeft] = useState<TimeLeft>({
     days: 0,
     hours: 0,
     minutes: 0,
@@ -21,18 +23,7 @@ export function CountdownTimer({ targetDate, title }: CountdownTimerProps) {
 
   useEffect(() => {
     const calculateTimeLeft = () => {
-      const difference = new Date(targetDate).getTime() - new Date().getTime();
-      
-      if (difference > 0) {
-        setTimeLeft({
-          days: Math.floor(difference / (1000 * 60 * 60 * 24)),
-          hours: Math.floor((difference / (1000 * 60 * 60)) % 24),
-          minutes: Math.floor((difference / 1000 / 60) % 60),
-          seconds: Math.floor((difference / 1000) % 60),
-        });
-      } else {
-        setTimeLeft({ days: 0, hours: 0, minutes: 0, seconds: 0 });
-      }
+      setTimeLeft(timeUtil.calculateTimeLeft(targetDate));
     };
 
     calculateTimeLeft();

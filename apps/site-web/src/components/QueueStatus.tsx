@@ -5,18 +5,15 @@ import { Card, Typography, Space, Tag, Button, Spin } from 'antd';
 import { ClockCircleOutlined, CheckCircleOutlined, ReloadOutlined } from '@ant-design/icons';
 import { toast } from 'react-toastify';
 
+import type { QueuePosition } from '@/types';
+import { queueService } from '@/services';
+import { timeUtil } from '@/utils';
+
 const { Title, Text } = Typography;
 
 interface QueueStatusProps {
   userEmail: string;
   flashSaleId: string;
-}
-
-interface QueuePosition {
-  position: number | null;
-  size: number;
-  holdTtlSec: number;
-  hasActiveHold: boolean;
 }
 
 export function QueueStatus({ userEmail, flashSaleId }: QueueStatusProps) {
@@ -27,16 +24,7 @@ export function QueueStatus({ userEmail, flashSaleId }: QueueStatusProps) {
   const fetchPosition = async () => {
     setLoading(true);
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
-      const response = await fetch(
-        `${apiUrl}/orders/position?email=${encodeURIComponent(userEmail)}&flashSaleId=${flashSaleId}`
-      );
-      
-      if (!response.ok) {
-        throw new Error('Failed to fetch position');
-      }
-      
-      const data = await response.json();
+      const data = await queueService.getPosition(userEmail, flashSaleId);
       setPosition(data);
     } catch (error: any) {
       toast.error(error.message || 'Failed to fetch queue position');
@@ -48,25 +36,12 @@ export function QueueStatus({ userEmail, flashSaleId }: QueueStatusProps) {
   const handleConfirmPayment = async () => {
     setConfirming(true);
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
-      const response = await fetch(`${apiUrl}/orders/confirm`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          email: userEmail,
-          flashSaleId: flashSaleId,
-          totalAmount: 99.99, // Mock amount
-        }),
+      const result = await queueService.confirmPayment({
+        email: userEmail,
+        flashSaleId: flashSaleId,
+        totalAmount: 99.99, // Mock amount
       });
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(errorText || 'Failed to confirm payment');
-      }
-
-      const result = await response.json();
       toast.success(`Payment confirmed! Order ID: ${result.orderId}`);
       fetchPosition(); // Refresh status
     } catch (error: any) {
@@ -105,6 +80,7 @@ export function QueueStatus({ userEmail, flashSaleId }: QueueStatusProps) {
 
   const holdMinutes = Math.floor(position.holdTtlSec / 60);
   const holdSeconds = position.holdTtlSec % 60;
+  const holdTimeFormatted = timeUtil.formatDuration(position.holdTtlSec);
 
   return (
     <Card
@@ -128,7 +104,7 @@ export function QueueStatus({ userEmail, flashSaleId }: QueueStatusProps) {
                   Reservation Confirmed!
                 </Title>
                 <Text style={{ color: 'rgba(255,255,255,0.9)', fontSize: 16 }}>
-                  You have {holdMinutes}m {holdSeconds}s to complete your purchase
+                  You have {holdTimeFormatted} to complete your purchase
                 </Text>
               </div>
               <Button
