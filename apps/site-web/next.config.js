@@ -11,7 +11,7 @@ const nextConfig = {
   // See: https://nx.dev/recipes/next/next-config-setup
   nx: {},
   env: {
-    API_URL: `http://${process.env.BEND_HOST}:${process.env.BEND_PORT}`,
+    NEXT_PUBLIC_API_URL: `http://${process.env.BEND_HOST || 'localhost'}:${process.env.BEND_PORT || 4000}`,
   },
   typescript: {
     ignoreBuildErrors: false, // keep false ideally

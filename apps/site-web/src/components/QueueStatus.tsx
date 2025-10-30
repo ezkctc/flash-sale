@@ -27,8 +27,9 @@ export function QueueStatus({ userEmail, flashSaleId }: QueueStatusProps) {
   const fetchPosition = async () => {
     setLoading(true);
     try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/orders/position?email=${encodeURIComponent(userEmail)}&flashSaleId=${flashSaleId}`
+        `${apiUrl}/orders/position?email=${encodeURIComponent(userEmail)}&flashSaleId=${flashSaleId}`
       );
       
       if (!response.ok) {
@@ -47,7 +48,8 @@ export function QueueStatus({ userEmail, flashSaleId }: QueueStatusProps) {
   const handleConfirmPayment = async () => {
     setConfirming(true);
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/orders/confirm`, {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+      const response = await fetch(`${apiUrl}/orders/confirm`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
