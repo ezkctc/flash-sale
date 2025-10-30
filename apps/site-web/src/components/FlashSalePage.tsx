@@ -12,6 +12,7 @@ import { EmailPrompt } from './EmailPrompt';
 import { CountdownTimer } from './CountdownTimer';
 import { FlashSaleCard } from './FlashSaleCard';
 import { QueueStatus } from './QueueStatus';
+import { UserOrders } from './UserOrders';
 
 const { Content, Header } = Layout;
 const { Title, Text } = Typography;
@@ -199,6 +200,9 @@ export function FlashSalePage() {
                 </Text>
               </Card>
             )}
+
+            {/* User Orders Section */}
+            <UserOrders userEmail={userEmail} />
           </Space>
         )}
       </Content>
