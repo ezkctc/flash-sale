@@ -97,15 +97,23 @@ export function FlashSalesManager() {
 
   async function handleOk() {
     try {
-      const payload: FlashSaleShape = {
+      const basePayload = {
         name: formValues.name,
         description: formValues.description,
         startsAt: dayjs(formValues.startsAt).toISOString(),
         endsAt: dayjs(formValues.endsAt).toISOString(),
-        startingQuantity: Number(formValues.inventory ?? 0),
-        currentQuantity: Number(formValues.inventory ?? 0),
+        startingQuantity: Number(formValues.startingQuantity ?? 0),
         status: editing?.status,
-      } as any;
+      };
+
+      // For new flash sales, set currentQuantity = startingQuantity
+      // For editing, don't include currentQuantity (let backend handle it)
+      const payload: FlashSaleShape = editing?._id 
+        ? basePayload as FlashSaleShape
+        : { 
+            ...basePayload, 
+            currentQuantity: Number(formValues.startingQuantity ?? 0) 
+          } as FlashSaleShape;
 
       if (editing?._id) {
         await updateFlashSale(editing._id, payload);
@@ -162,6 +170,11 @@ export function FlashSalesManager() {
         destroyOnHidden
       >
         <FlashSaleForm initial={editing} onChange={setFormValues} />
+        <FlashSaleForm 
+          initial={editing} 
+          isEditing={!!editing} 
+          onChange={setFormValues} 
+        />
       </Modal>
     </Card>
   );
