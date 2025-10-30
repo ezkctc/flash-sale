@@ -21,7 +21,7 @@ The Better Auth CLI schema steps are not applicable for MongoDB. Skip generate/m
 ## 2) Configure Environment
 
 - See `.env` / `env.sample` for:
-  - `MONGO_URL`, `MONGODB_URI`, `MONGO_DB`
+  - `MONGODB_URL`, `MONGODB_URI`, `MONGO_DB`
   - `REDIS_URL`
   - `BEND_HOST`, `BEND_PORT`
   - `QUEUE_NAME`

@@ -1,11 +1,11 @@
 'use client';
 
 import React from 'react';
-import { Layout, Typography, Avatar, Dropdown, Menu, Card } from 'antd';
+import { Layout, Typography, Avatar, Dropdown, Card } from 'antd';
 import { UserOutlined, LogoutOutlined } from '@ant-design/icons';
 import { ProtectedRoute } from '../../components/auth/protected-route';
-import { authClient } from '@/lib/auth/auth-client';
 import { LogoutButton } from '../../components/auth/logout-button';
+import { FlashSalesManager } from '../../components/flash-sales/FlashSalesManager';
 
 const { Header, Content } = Layout;
 const { Title, Text } = Typography;
@@ -47,12 +47,7 @@ export default function DashboardPage() {
         </Header>
 
         <Content style={{ padding: '24px' }}>
-          <Card>
-            <Title level={3}>Welcome to the Admin Panel</Title>
-            <Text type="secondary">
-              You are successfully authenticated with Better Auth!
-            </Text>
-          </Card>
+          <FlashSalesManager />
         </Content>
       </Layout>
     </ProtectedRoute>

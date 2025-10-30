@@ -19,12 +19,12 @@ export async function app(fastify: FastifyInstance, opts: AppOptions) {
   // This loads all plugins defined in plugins
   // those should be support plugins that are reused
   // through your application
-  fastify.register(AutoLoad, {
+  await fastify.register(AutoLoad, {
     dir: path.join(__dirname, 'plugins'),
     options: { ...opts },
   });
   // Also load top-level plugins (e.g., mongo, auth)
-  fastify.register(AutoLoad, {
+  await fastify.register(AutoLoad, {
     dir: path.join(__dirname, '..', 'plugins'),
     options: { ...opts },
   });

@@ -53,7 +53,7 @@ services:
       - .env
     environment:
       # Fallbacks if not provided in .env
-      MONGO_URL: ${MONGO_URL:-mongodb://root:example@mongo:27017/?authSource=admin}
+      MONGODB_URL: ${MONGODB_URL:-mongodb://root:example@mongo:27017/?authSource=admin}
       REDIS_URL: ${REDIS_URL:-redis://:redispass@redis:6379}
     depends_on:
       redis:
@@ -71,7 +71,7 @@ services:
     env_file:
       - .env
     environment:
-      MONGO_URL: ${MONGO_URL:-mongodb://root:example@mongo:27017/?authSource=admin}
+      MONGODB_URL: ${MONGODB_URL:-mongodb://root:example@mongo:27017/?authSource=admin}
       REDIS_URL: ${REDIS_URL:-redis://:redispass@redis:6379}
     depends_on:
       redis:

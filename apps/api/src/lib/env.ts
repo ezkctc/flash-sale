@@ -23,5 +23,6 @@ function deriveFromMongoUrl(mongoUrl?: string) {
 
 export const env = schema.parse({
   ...process.env,
+  // Prefer MONGO_URL (includes credentials + db) when provided
   ...deriveFromMongoUrl(process.env.MONGO_URL),
 });

@@ -476,7 +476,7 @@ FEND_HOST=localhost
 FEND_PORT=4201
 
 # Database
-MONGO_URL=mongodb://root:example@localhost:27017/flash_sale_db?authSource=admin
+MONGODB_URI=mongodb://root:example@localhost:27017/flash_sale_db?authSource=admin
 
 # Redis
 REDIS_URL=redis://:redispass@localhost:6379

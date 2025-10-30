@@ -1,20 +1,20 @@
 /*
  Reset Better Auth data in MongoDB.
  - Clears users, sessions, verifications, accounts, rate limits (singular/plural variants).
- - Uses MONGO_URL if provided; otherwise MONGODB_URI + MONGO_DB.
+ - Uses MONGODB_URL if provided; otherwise MONGODB_URI + MONGO_DB.
 */
 
 const { MongoClient } = require('mongodb');
 
 (async () => {
   const mongoUrl =
-    process.env.MONGO_URL ||
+    process.env.MONGODB_URL ||
     process.env.MONGODB_URI ||
     'mongodb://127.0.0.1:27017';
   const dbName =
     process.env.MONGO_DB ||
-    (process.env.MONGO_URL
-      ? new URL(process.env.MONGO_URL).pathname.replace(/^\//, '') ||
+    (process.env.MONGODB_URL
+      ? new URL(process.env.MONGODB_URL).pathname.replace(/^\//, '') ||
         'flashsale'
       : 'flashsale');
 

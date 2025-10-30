@@ -13,6 +13,7 @@ async function queuePlugin(app: FastifyInstance) {
   const queue = new Queue('sale-processing-queue', {
     connection: { url: env.REDIS_URL },
   });
+  app.log.info(`Connected to Redis: ${env.REDIS_URL}`);
   app.decorate('saleQueue', queue);
 
   app.addHook('onClose', async () => {
@@ -21,4 +22,3 @@ async function queuePlugin(app: FastifyInstance) {
 }
 
 export default fp(queuePlugin, { name: 'queue' });
-

@@ -5,8 +5,8 @@ import mongoose from 'mongoose';
 import { flashSaleMongoModel } from '@flash-sale/shared-types';
 
 const REDIS_URL = process.env.REDIS_URL ?? 'redis://:redispass@localhost:6379';
-const MONGO_URL =
-  process.env.MONGO_URL ??
+const MONGODB_URI =
+  process.env.MONGODB_URI ??
   'mongodb://root:example@localhost:27017/flash_sale_db?authSource=admin';
 const QUEUE_NAME = process.env.QUEUE_NAME ?? 'sale-processing-queue';
 
@@ -14,7 +14,7 @@ const holdKey = (saleId: string, email: string) => `fsh:${saleId}:${email}`;
 const saleCacheKey = (saleId: string) => `fsmeta:${saleId}`; // small meta cache
 
 async function bootstrap() {
-  await mongoose.connect(MONGO_URL);
+  await mongoose.connect(MONGODB_URI);
   console.log('[worker] connected to Mongo');
   const redis = new IORedis(REDIS_URL);
 

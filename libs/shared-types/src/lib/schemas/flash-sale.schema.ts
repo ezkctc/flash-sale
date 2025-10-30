@@ -10,8 +10,6 @@ import { FlashSaleStatus } from '../enums/index.js';
 
 export const flashSaleSchema = new Schema(
   {
-    _id: { type: Schema.Types.ObjectId },
-
     name: {
       type: String,
       trim: true,

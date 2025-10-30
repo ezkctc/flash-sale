@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { Button } from 'antd';
-import { authClient } from '@/lib/auth/auth-client'; // ✅ import the full client
+import { API_ROOT } from '@/lib/services/api';
 import { toast } from 'react-toastify';
 
 export function LogoutButton() {
@@ -11,7 +11,16 @@ export function LogoutButton() {
   const handleLogout = async () => {
     setLoading(true);
     try {
-      await authClient.signOut();
+      const token = localStorage.getItem('auth_token');
+      if (token) {
+        await fetch(`${API_ROOT}/api/auth/sign-out`, {
+          method: 'POST',
+          headers: { authorization: `Bearer ${token}` },
+          credentials: 'include',
+        }).catch(() => {
+          // do nothing
+        });
+      }
       toast.success('Signed out successfully');
       localStorage.removeItem('auth_token');
       window.location.href = '/login';

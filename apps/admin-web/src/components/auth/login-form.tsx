@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { Form, Input, Button, Card } from 'antd';
-import { authClient } from '@/lib/auth/auth-client';
+import { API_ROOT } from '@/lib/services/api';
 
 import { toast } from 'react-toastify';
 
@@ -13,19 +13,21 @@ export function LoginForm() {
     setLoading(true);
 
     try {
-      const result = await authClient.signIn.email({
-        email: values.email,
-        password: values.password,
+      const res = await fetch(`${API_ROOT}/api/auth/sign-in/email`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(values),
+        credentials: 'include',
       });
-
-      if (result.error) {
-        toast.error(result.error.message || 'Failed to sign in');
-      } else {
-        localStorage.setItem('auth_token', result.data.token);
-
-        toast.success('Signed in successfully');
-        window.location.href = '/dashboard';
+      if (!res.ok) {
+        const txt = await res.text();
+        throw new Error(txt || `Sign in failed: ${res.status}`);
       }
+      const json = await res.json();
+      if (!json?.token) throw new Error('No token in response');
+      localStorage.setItem('auth_token', json.token);
+      toast.success('Signed in successfully');
+      window.location.href = '/dashboard';
     } catch (err) {
       console.error(err);
       toast.error('An unexpected error occurred');
