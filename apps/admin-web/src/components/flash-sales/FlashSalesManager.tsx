@@ -109,7 +109,7 @@ export function FlashSalesManager() {
 
       // For new flash sales, use the form values
       // For editing, both quantities can be increased
-      const payload: FlashSaleShape = basePayload as FlashSaleShape;
+      const payload: FlashSaleShape = basePayload as unknown as FlashSaleShape;
 
       if (editing?._id) {
         await updateFlashSale(editing._id, payload);
@@ -166,11 +166,6 @@ export function FlashSalesManager() {
         destroyOnHidden
       >
         <FlashSaleForm initial={editing} onChange={setFormValues} />
-        <FlashSaleForm 
-          initial={editing} 
-          isEditing={!!editing} 
-          onChange={setFormValues} 
-        />
       </Modal>
     </Card>
   );

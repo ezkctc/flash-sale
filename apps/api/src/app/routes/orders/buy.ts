@@ -5,10 +5,11 @@ import IORedis from 'ioredis';
 const QUEUE_NAME = process.env.QUEUE_NAME ?? 'sale-processing-queue';
 const REDIS_URL = process.env.REDIS_URL ?? 'redis://:redispass@localhost:6379';
 
-const zsetKey = (flashSaleId: string) => `fsq:${flashSaleId}`;
+// Redis keys
+const zsetKey = (flashSaleId: string) => `fsq:${flashSaleId}`; // visible queue
 const holdKey = (flashSaleId: string, email: string) =>
-  `fsh:${flashSaleId}:${email}`;
-const HOLD_TTL_SECONDS = Number(process.env.HOLD_TTL_SECONDS ?? 900);
+  `fsh:${flashSaleId}:${email}`; // TTL hold (worker sets)
+const HOLD_TTL_SECONDS = Number(process.env.HOLD_TTL_SECONDS ?? 900); // 15 mins
 
 type BuyBody = { email: string; flashSaleId: string };
 
@@ -46,37 +47,29 @@ export default async function (app: FastifyInstance) {
         },
       },
     },
-    async function (
-      request: FastifyRequest<{ Body: BuyBody }>,
-      reply: FastifyReply
-    ) {
+    async (request: FastifyRequest<{ Body: BuyBody }>, reply: FastifyReply) => {
       try {
-        const rawEmail = request.body.email;
+        const email = request.body.email?.trim().toLowerCase();
         const flashSaleId = request.body.flashSaleId;
-
-        if (!rawEmail || !flashSaleId) {
+        if (!email || !flashSaleId) {
           return reply
             .code(400)
             .send({ message: 'Email and flashSaleId are required' });
         }
 
-        // Normalize to match worker’s keying convention (avoid mismatched keys)
-        const email = rawEmail.trim().toLowerCase();
+        const nowMs = Date.now();
 
-        // Check hold TTL precisely (ms) and convert to seconds
-        const key = holdKey(flashSaleId, email);
-        let pttl = await redis.pttl(key); // ms
-        // pttl semantics: -2 = key does not exist; -1 = no expire; >=0 = ms remaining
+        // Check existing hold precisely (ms), then ceil to seconds for UX
+        const pttl = await redis.pttl(holdKey(flashSaleId, email)); // -2 no key, -1 no expire, >=0 ms
         const hasActiveHold = pttl > 0 || pttl === -1;
         const holdTtlSec =
           pttl > 0
-            ? Math.ceil(pttl / 1000) // avoid 0 when <1s remains
+            ? Math.ceil(pttl / 1000)
             : pttl === -1
-            ? HOLD_TTL_SECONDS // fallback if worker forgot EX—treat as full window
-            : 0; // no key
+            ? HOLD_TTL_SECONDS
+            : 0;
 
-        // Enqueue work for the worker to grant/set the hold
-        const nowMs = Date.now();
+        // Enqueue reserve job (worker will validate and set/refresh the hold)
         const job = await queue.add(
           'reserve',
           {
@@ -88,25 +81,27 @@ export default async function (app: FastifyInstance) {
           { removeOnComplete: true, removeOnFail: true }
         );
 
-        // Track visible position in a ZSET (score = enqueue time)
+        // Track visible position in ZSET (score = enqueue time); add if not present
         const qKey = zsetKey(flashSaleId);
-        const alreadyIn = await redis.zrank(qKey, email);
-        if (alreadyIn === null) {
-          await redis.zadd(qKey, nowMs, email);
-        }
         const rank = await redis.zrank(qKey, email);
-        const size = await redis.zcard(qKey);
+        if (rank === null) {
+          await redis.zadd(qKey, nowMs, email); // score=now
+        }
+        const [pos, size] = await Promise.all([
+          redis.zrank(qKey, email).then((r) => (r ?? 0) + 1),
+          redis.zcard(qKey),
+        ]);
 
         return reply.code(200).send({
           queued: true,
-          position: (rank ?? 0) + 1,
+          position: pos,
           size,
           hasActiveHold,
           holdTtlSec,
           jobId: String(job.id),
         });
-      } catch (error) {
-        request.log.error(error);
+      } catch (err) {
+        request.log.error(err);
         return reply.code(500).send({ message: 'Failed to enqueue order' });
       }
     }

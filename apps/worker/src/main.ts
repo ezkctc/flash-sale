@@ -3,6 +3,7 @@ import { Worker, Job } from 'bullmq';
 import IORedis from 'ioredis';
 import mongoose from 'mongoose';
 import { flashSaleMongoModel } from '@flash-sale/shared-types';
+import { FlashSaleStatus } from '@flash-sale/shared-types';
 
 const REDIS_URL = process.env.REDIS_URL ?? 'redis://:redispass@localhost:6379';
 const MONGODB_URI =
@@ -11,84 +12,92 @@ const MONGODB_URI =
 const QUEUE_NAME = process.env.QUEUE_NAME ?? 'sale-processing-queue';
 
 const holdKey = (saleId: string, email: string) => `fsh:${saleId}:${email}`;
-const saleCacheKey = (saleId: string) => `fsmeta:${saleId}`; // small meta cache
+const zsetKey = (saleId: string) => `fsq:${saleId}`;
+const saleCacheKey = (saleId: string) => `fsmeta:${saleId}`; // optional meta cache
 
 async function bootstrap() {
+  // Connect Mongo (await before worker starts)
   await mongoose.connect(MONGODB_URI);
-  console.log('[worker] connected to Mongo');
+
   const redis = new IORedis(REDIS_URL);
 
   const worker = new Worker(
     QUEUE_NAME,
     async (job: Job) => {
+      if (job.name !== 'reserve') return;
+
       const {
-        email,
+        email: rawEmail,
         flashSaleId,
-        holdTtlSec = 900, // hold order for 15min to allow payment gateway to process
+        holdTtlSec,
       } = job.data as {
         email: string;
         flashSaleId: string;
-        holdTtlSec?: number;
+        holdTtlSec: number;
       };
 
-      // --- fetch window metadata, cached for 10 min to avoid hammering Mongo ---
-      let saleMeta = await redis.get(saleCacheKey(flashSaleId));
+      const email = rawEmail?.trim().toLowerCase();
+      if (!email || !flashSaleId) {
+        throw new Error('Missing email or flashSaleId');
+      }
+
+      // Validate sale window & status (read-through cache -> Mongo)
+      const now = new Date();
+      let saleMeta: any | null = null;
+      const cached = await redis.get(saleCacheKey(flashSaleId));
+      if (cached) {
+        try {
+          saleMeta = JSON.parse(cached);
+        } catch {}
+      }
       if (!saleMeta) {
-        const sale = await flashSaleMongoModel
-          .findById(flashSaleId, { startsAt: 1, endsAt: 1 })
-          .lean();
-        if (!sale) return { ok: false, reason: 'sale_not_found' };
-
-        saleMeta = JSON.stringify({
-          startsAt: sale.startsAt.getTime(),
-          endsAt: sale.endsAt.getTime(),
-        });
-        // cache for 10min — sale window doesn’t change often
-        await redis.setex(saleCacheKey(flashSaleId), 600, saleMeta);
+        saleMeta = await flashSaleMongoModel
+          .findById(flashSaleId, { startsAt: 1, endsAt: 1, status: 1 })
+          .lean()
+          .exec();
+        if (!saleMeta) throw new Error('Flash sale not found');
+        // cache briefly (30s)
+        await redis.set(
+          saleCacheKey(flashSaleId),
+          JSON.stringify(saleMeta),
+          'EX',
+          30
+        );
       }
 
-      const { startsAt, endsAt } = JSON.parse(saleMeta) as {
-        startsAt: number;
-        endsAt: number;
-      };
-      const now = Date.now();
-      if (!(startsAt <= now && now <= endsAt)) {
-        return { ok: false, reason: 'outside_window' };
+      const isActive =
+        saleMeta.status === FlashSaleStatus.OnSchedule &&
+        new Date(saleMeta.startsAt) <= now &&
+        now < new Date(saleMeta.endsAt);
+
+      if (!isActive) {
+        // Just drop from the visible queue and exit; API will reflect position shrink on next poll
+        await redis.zrem(zsetKey(flashSaleId), email);
+        throw new Error('Flash sale not active');
       }
 
-      // --- idempotent hold grant ---
-      const existsTtl = await redis.ttl(holdKey(flashSaleId, email));
-      if (existsTtl > 0) {
-        return { ok: true, reason: 'already_has_hold', ttl: existsTtl };
-      }
-
+      // Set/refresh the hold (EX in seconds). Only mark the hold; do NOT decrement inventory here.
       await redis.set(
         holdKey(flashSaleId, email),
-        JSON.stringify({
-          flashSaleId,
-          email,
-          grantedAt: Date.now(),
-          ttlSec: holdTtlSec,
-        }),
+        '1',
         'EX',
-        holdTtlSec,
-        'NX'
+        Math.max(1, Number(holdTtlSec) || 900)
       );
 
-      return { ok: true, granted: true, ttl: holdTtlSec };
+      // Remove user from visible queue ZSET after worker processed their turn
+      await redis.zrem(zsetKey(flashSaleId), email);
+
+      return { ok: true };
     },
-    {
-      connection: { url: REDIS_URL },
-      concurrency: 1,
-      // optional: throttle to 50 holds/sec if needed
-      limiter: { max: 50, duration: 1000 },
-    }
+    { connection: { url: REDIS_URL }, concurrency: 8 }
   );
 
-  worker.on('ready', () => console.log(`[worker] listening on ${QUEUE_NAME}`));
-  worker.on('failed', (job, err) =>
-    console.error('[worker] failed', job?.id, err)
-  );
+  worker.on('completed', (job) => {
+    // optional logging
+  });
+  worker.on('failed', (job, err) => {
+    // optional logging
+  });
 
   const shutdown = async () => {
     await worker.close();
