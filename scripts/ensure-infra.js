@@ -1,6 +1,44 @@
 // scripts/ensure-infra.js
 const { execSync } = require('child_process');
 const net = require('net');
+const fs = require('fs');
+const path = require('path');
+
+function which(cmd) {
+  try {
+    execSync(process.platform === 'win32' ? `where ${cmd}` : `which ${cmd}`);
+    return true;
+  } catch {
+    return false;
+  }
+}
+const composeCmd = which('docker')
+  ? 'docker compose'
+  : which('docker-compose')
+  ? 'docker-compose'
+  : null;
+if (!composeCmd) {
+  console.error('[err] Neither `docker` nor `docker-compose` found in PATH');
+  process.exit(1);
+}
+
+// ensure we execute in the folder that has docker-compose.yml
+const repoRootCandidates = [
+  process.cwd(),
+  path.resolve(__dirname, '..'),
+  path.resolve(__dirname, '..', '..'),
+];
+const composeCwd = repoRootCandidates.find((p) =>
+  fs.existsSync(path.join(p, 'docker-compose.yml'))
+);
+if (!composeCwd) {
+  console.error(
+    '[err] Cannot find docker-compose.yml from',
+    repoRootCandidates
+  );
+  process.exit(1);
+}
+process.chdir(composeCwd);
 
 function sh(cmd) {
   return execSync(cmd, { stdio: ['ignore', 'pipe', 'pipe'] })
@@ -19,23 +57,21 @@ function isContainerRunning(name) {
   }
 }
 
-function isPortOpen(host, port, timeoutMs = 600) {
+function isPortOpen(host, port, timeoutMs = 1200) {
   return new Promise((resolve) => {
     const socket = new net.Socket();
     let done = false;
-
     const finish = (val) => {
       if (!done) {
         done = true;
         try {
           socket.destroy();
         } catch {
-          //dont do anything
+          //do nothing
         }
         resolve(val);
       }
     };
-
     socket.setTimeout(timeoutMs);
     socket.once('connect', () => finish(true));
     socket.once('timeout', () => finish(false));
@@ -44,26 +80,65 @@ function isPortOpen(host, port, timeoutMs = 600) {
   });
 }
 
+async function waitForHealthyOrPort({
+  containerName,
+  host,
+  port,
+  maxWaitMs = 60000,
+}) {
+  const start = Date.now();
+  while (Date.now() - start < maxWaitMs) {
+    try {
+      const status = sh(
+        `docker inspect -f "{{.State.Health.Status}}" ${containerName}`
+      );
+      if (status === 'healthy') return true;
+    } catch {
+      /* no healthcheck */
+    }
+    if (await isPortOpen(host, port, 1000)) return true;
+    await new Promise((r) => setTimeout(r, 1000));
+  }
+  return false;
+}
+
 async function ensureService({ service, containerName, host, port }) {
-  // 1) If our named container is already running, reuse it.
   if (isContainerRunning(containerName)) {
-    console.log(`[ok] ${containerName} already running, reusing it.`);
+    console.log(
+      `[ok] ${containerName} already running, waiting for readiness...`
+    );
+    const ready = await waitForHealthyOrPort({ containerName, host, port });
+    if (!ready) {
+      console.error(`[err] ${containerName} did not become ready in time`);
+      process.exitCode = 1;
+    } else {
+      console.log(`[ok] ${containerName} is ready`);
+    }
     return;
   }
 
-  // 2) If port is already in use, assume an external instance and skip.
   if (await isPortOpen(host, port)) {
     console.log(
-      `[ok] Port ${host}:${port} is already in use. Assuming external ${service}. Skipping start.`
+      `[ok] Port ${host}:${port} in use. Assuming external ${service}.`
     );
     return;
   }
 
-  // 3) Otherwise, bring up just this service.
-  console.log(`[start] docker compose up -d ${service}`);
+  console.log(`[start] ${composeCmd} up -d ${service}`);
   try {
-    sh(`docker compose up -d ${service}`);
-    console.log(`[ok] ${service} started`);
+    sh(`${composeCmd} up -d ${service}`);
+    const ready = await waitForHealthyOrPort({ containerName, host, port });
+    if (!ready) {
+      console.error(`[err] ${service} started but not ready. Recent logs:`);
+      try {
+        console.error(sh(`docker logs --tail=100 ${containerName}`));
+      } catch {
+        //do nothing
+      }
+      process.exitCode = 1;
+    } else {
+      console.log(`[ok] ${service} is ready`);
+    }
   } catch (e) {
     console.error(`[err] Failed to start ${service}:`, e?.message || e);
     process.exitCode = 1;

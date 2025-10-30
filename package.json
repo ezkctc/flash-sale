@@ -7,13 +7,15 @@
     "infra:down": "docker compose down -v",
     "infra:logs": "docker compose logs -f",
     "infra:ensure": "node scripts/ensure-infra.js",
+    "build": "nx affected --target=build",
     "dev:api": "nx serve @flash-sale/api",
     "dev:worker": "nx serve @flash-sale/worker",
     "dev:admin": "nx serve @flash-sale/admin-web",
     "dev:site": "nx serve @flash-sale/site-web",
     "dev": "cross-env NX_DAEMON=false npm run infra:ensure && concurrently \"nx serve @flash-sale/api\" \"nx serve @flash-sale/worker\" \"nx serve @flash-sale/admin-web\" \"nx serve @flash-sale/site-web\"",
     "seed": "tsx apps/api/src/seed.ts",
-    "seed:admin": "tsx apps/api/src/seed-admin.ts"
+    "seed:admin": "tsx apps/api/src/seed-admin.ts",
+    "auth:reset": "node scripts/reset-better-auth.js"
   },
   "private": true,
   "devDependencies": {
@@ -58,6 +60,7 @@
     "worker"
   ],
   "dependencies": {
+    "@ant-design/nextjs-registry": "^1.2.0",
     "@ant-design/v5-patch-for-react-19": "^1.0.3",
     "@fastify/autoload": "~6.0.3",
     "@fastify/cookie": "^11.0.2",

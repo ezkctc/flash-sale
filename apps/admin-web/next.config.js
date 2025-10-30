@@ -10,9 +10,6 @@ const nextConfig = {
   // Use this to set Nx-specific options
   // See: https://nx.dev/recipes/next/next-config-setup
   nx: {},
-  env: {
-    API_URL: `http://${process.env.BEND_HOST}:${process.env.BEND_PORT}`,
-  },
 };
 
 const plugins = [

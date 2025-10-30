@@ -21,6 +21,18 @@ async function mongoPlugin(fastify: FastifyInstance) {
 
   fastify.decorate('mongo', { client, db });
 
+  // Ensure TTL index for token sessions
+  fastify.addHook('onReady', async () => {
+    try {
+      await db
+        .collection('sessions')
+        .createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+      fastify.log.info('Ensured TTL index on sessions.expiresAt');
+    } catch (e) {
+      fastify.log.error(e as any, 'Failed creating TTL index on sessions');
+    }
+  });
+
   fastify.addHook('onClose', async (app) => {
     await app.mongo.client.close();
   });

@@ -1,53 +1,60 @@
 'use client';
 
+import React from 'react';
+import { Layout, Typography, Avatar, Dropdown, Menu, Card } from 'antd';
+import { UserOutlined, LogoutOutlined } from '@ant-design/icons';
 import { ProtectedRoute } from '../../components/auth/protected-route';
+import { authClient } from '@/lib/auth/auth-client';
 import { LogoutButton } from '../../components/auth/logout-button';
-import { useSession } from '../../lib/auth/auth-client';
+
+const { Header, Content } = Layout;
+const { Title, Text } = Typography;
 
 export default function DashboardPage() {
-  const { data: session } = useSession();
+  const menuItems = [
+    {
+      key: 'logout',
+      label: <LogoutButton />,
+      icon: <LogoutOutlined />,
+    },
+  ];
 
   return (
     <ProtectedRoute>
-      <div className="min-h-screen bg-gray-50">
-        <nav className="bg-white shadow-sm">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex justify-between items-center h-16">
-              <div className="flex items-center">
-                <h1 className="text-xl font-semibold text-gray-900">
-                  Admin Dashboard
-                </h1>
-              </div>
-              <div className="flex items-center space-x-4">
-                <span className="text-sm text-gray-700">
-                  {session?.user?.email}
-                </span>
-                <LogoutButton />
-              </div>
-            </div>
-          </div>
-        </nav>
+      <Layout style={{ minHeight: '100vh', background: '#f5f5f5' }}>
+        <Header
+          style={{
+            background: '#fff',
+            boxShadow: '0 1px 4px rgba(0,0,0,0.1)',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            padding: '0 24px',
+          }}
+        >
+          <Title level={4} style={{ margin: 0 }}>
+            Admin Dashboard
+          </Title>
 
-        <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-          <div className="px-4 py-6 sm:px-0">
-            <div className="bg-white shadow rounded-lg p-6">
-              <h2 className="text-2xl font-bold text-gray-900 mb-4">
-                Welcome to the Admin Panel
-              </h2>
-              <p className="text-gray-600 mb-4">
-                You are successfully authenticated with Better Auth!
-              </p>
-
-              <div className="bg-gray-50 p-4 rounded-md">
-                <h3 className="font-semibold text-gray-900 mb-2">User Info:</h3>
-                <pre className="text-sm text-gray-700 overflow-auto">
-                  {JSON.stringify(session?.user, null, 2)}
-                </pre>
-              </div>
-            </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+            <Dropdown menu={{ items: menuItems }} trigger={['click']}>
+              <Avatar
+                style={{ backgroundColor: '#1677ff', cursor: 'pointer' }}
+                icon={<UserOutlined />}
+              />
+            </Dropdown>
           </div>
-        </main>
-      </div>
+        </Header>
+
+        <Content style={{ padding: '24px' }}>
+          <Card>
+            <Title level={3}>Welcome to the Admin Panel</Title>
+            <Text type="secondary">
+              You are successfully authenticated with Better Auth!
+            </Text>
+          </Card>
+        </Content>
+      </Layout>
     </ProtectedRoute>
   );
 }

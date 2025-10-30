@@ -18,7 +18,7 @@ export function createAuth({
   return betterAuth({
     database: mongodbAdapter(db),
 
-    emailAndPassword: { enabled: true },
+    emailAndPassword: { enabled: true, requireEmailVerification: false },
 
     trustedOrigins: [apiOrigin, ...clientOrigins],
 

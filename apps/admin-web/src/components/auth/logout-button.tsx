@@ -1,7 +1,9 @@
 'use client';
 
-import { useState } from 'react';
-import { signOut } from '../../lib/auth/auth-client';
+import React, { useState } from 'react';
+import { Button } from 'antd';
+import { authClient } from '@/lib/auth/auth-client'; // ✅ import the full client
+import { toast } from 'react-toastify';
 
 export function LogoutButton() {
   const [loading, setLoading] = useState(false);
@@ -9,22 +11,28 @@ export function LogoutButton() {
   const handleLogout = async () => {
     setLoading(true);
     try {
-      await signOut();
+      await authClient.signOut();
+      toast.success('Signed out successfully');
+      localStorage.removeItem('auth_token');
       window.location.href = '/login';
     } catch (err) {
       console.error('Failed to sign out:', err);
+      toast.error('Failed to sign out');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <button
+    <Button
+      type="primary"
+      danger
+      loading={loading}
       onClick={handleLogout}
-      disabled={loading}
-      className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50"
+      className="mt-4"
+      block
     >
       {loading ? 'Signing out...' : 'Sign Out'}
-    </button>
+    </Button>
   );
 }

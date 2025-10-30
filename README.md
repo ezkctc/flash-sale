@@ -169,6 +169,7 @@ graph LR
 ## Technology Stack
 
 ### Backend
+
 - **Fastify 5.x**: High-performance web framework
 - **BullMQ**: Redis-backed job queue for FIFO processing
 - **MongoDB 7**: Primary data store with atomic operations
@@ -176,15 +177,18 @@ graph LR
 - **Mongoose**: MongoDB ODM with schema validation
 
 ### Frontend
+
 - **Next.js 15**: React framework for SSR/SSG
 - **React 19**: UI library
 - **TypeScript**: Type-safe development
 
 ### Infrastructure
+
 - **Docker Compose**: Local development environment
 - **Nx**: Monorepo build system and task orchestration
 
 ### Authentication
+
 - **JWT**: Token-based authentication
 - **Fastify JWT**: JWT plugin for route protection
 
@@ -258,6 +262,7 @@ graph TB
 ### 1. API Server (`apps/api`)
 
 **Responsibilities:**
+
 - Handle HTTP requests from clients
 - Enqueue purchase attempts to BullMQ
 - Validate and confirm payments
@@ -265,6 +270,7 @@ graph TB
 - Admin operations (CRUD on sales)
 
 **Key Routes:**
+
 - `POST /auth/signup` - Create admin account
 - `POST /auth/signin` - Authenticate admin
 - `POST /auth/signout` - End session
@@ -281,12 +287,14 @@ graph TB
 ### 2. Worker Service (`apps/worker`)
 
 **Responsibilities:**
+
 - Consume jobs from BullMQ queue (FIFO)
 - Validate sale time windows
 - Grant time-limited holds in Redis
 - Rate limiting (50 holds/second)
 
 **Processing Logic:**
+
 ```typescript
 1. Fetch sale metadata (cached 10 min)
 2. Check if current time within [startsAt, endsAt]
@@ -296,6 +304,7 @@ graph TB
 ```
 
 **Configuration:**
+
 - Concurrency: 1 (strict FIFO)
 - Rate Limit: 50 jobs/second
 - Hold TTL: 900 seconds (15 minutes)
@@ -303,6 +312,7 @@ graph TB
 ### 3. Admin Dashboard (`apps/admin-web`)
 
 **Features:**
+
 - JWT-based authentication
 - Create/edit/delete flash sales
 - View all orders
@@ -312,6 +322,7 @@ graph TB
 ### 4. Customer Site (`apps/site-web`)
 
 **Features:**
+
 - View active/upcoming flash sales
 - Countdown timer to sale start
 - Purchase button (only active during sale)
@@ -324,6 +335,7 @@ graph TB
 ### Problem: Thundering Herd
 
 Thousands of users clicking "Buy" simultaneously creates:
+
 - Database overload
 - Race conditions
 - Unfair advantage to faster connections
@@ -365,18 +377,19 @@ graph TB
 await flashSaleMongoModel.findOneAndUpdate(
   {
     _id: flashSaleId,
-    currentQuantity: { $gt: 0 },      // Only if inventory > 0
-    startsAt: { $lte: now },          // Sale must have started
-    endsAt: { $gte: now },            // Sale must not have ended
+    currentQuantity: { $gt: 0 }, // Only if inventory > 0
+    startsAt: { $lte: now }, // Sale must have started
+    endsAt: { $gte: now }, // Sale must not have ended
   },
   {
-    $inc: { currentQuantity: -1 }     // Atomic decrement
+    $inc: { currentQuantity: -1 }, // Atomic decrement
   },
   { new: true }
 );
 ```
 
 **Why This Works:**
+
 - MongoDB's `findOneAndUpdate` is atomic
 - Query conditions prevent matching if inventory is 0
 - Returns `null` if no document matches
@@ -419,6 +432,7 @@ npm run seed:admin
 ```
 
 Default admin credentials:
+
 - Email: `admin@example.com`
 - Password: `admin123`
 
@@ -431,6 +445,7 @@ npm run dev
 ```
 
 This starts:
+
 - **API**: http://localhost:4000
 - **Worker**: Background process
 - **Admin Web**: http://localhost:4200
@@ -571,18 +586,19 @@ import { check } from 'k6';
 
 export const options = {
   stages: [
-    { duration: '30s', target: 100 },   // Ramp up to 100 users
-    { duration: '1m', target: 1000 },   // Ramp up to 1000 users
-    { duration: '30s', target: 0 },     // Ramp down
+    { duration: '30s', target: 100 }, // Ramp up to 100 users
+    { duration: '1m', target: 1000 }, // Ramp up to 1000 users
+    { duration: '30s', target: 0 }, // Ramp down
   ],
 };
 
 export default function () {
   const email = `user${__VU}@test.com`;
-  const res = http.post('http://localhost:4000/orders/buy',
+  const res = http.post(
+    'http://localhost:4000/orders/buy',
     JSON.stringify({
       email,
-      flashSaleId: 'YOUR_SALE_ID'
+      flashSaleId: 'YOUR_SALE_ID',
     }),
     { headers: { 'Content-Type': 'application/json' } }
   );
@@ -601,6 +617,7 @@ k6 run stress-test.js
 ```
 
 **Expected Results:**
+
 - All requests return 200 OK
 - Each user gets a queue position
 - No overselling occurs
@@ -612,11 +629,13 @@ k6 run stress-test.js
 ### 1. Why BullMQ over Direct Database Access?
 
 **Problem:** Direct database access under high concurrency leads to:
+
 - Database connection exhaustion
 - Lock contention
 - Unpredictable race conditions
 
 **Solution:** Queue-based processing provides:
+
 - O(1) enqueue operations (fast user feedback)
 - Controlled database access rate
 - FIFO fairness guarantees
@@ -625,21 +644,24 @@ k6 run stress-test.js
 ### 2. Why MongoDB with Atomic Operations?
 
 **Alternatives Considered:**
+
 - PostgreSQL with row-level locking
 - Redis as primary database
 
 **MongoDB Selected Because:**
+
 - Native support for atomic `findOneAndUpdate`
 - Flexible schema for rapid iteration
 - Horizontal scaling capabilities
 - Lower latency for document operations
 
 **Atomic Operations Prevent:**
+
 ```javascript
 // Without atomic operations (RACE CONDITION):
 const sale = await Sale.findById(id);
 if (sale.quantity > 0) {
-  sale.quantity -= 1;  // ⚠️ Race condition here!
+  sale.quantity -= 1; // ⚠️ Race condition here!
   await sale.save();
 }
 
@@ -655,6 +677,7 @@ await Sale.findOneAndUpdate(
 **Alternative:** Handle everything in API process
 
 **Separation Benefits:**
+
 - Independent scaling (scale workers separately from API)
 - Fault isolation (worker crash doesn't affect API)
 - Rate limiting without blocking API
@@ -665,6 +688,7 @@ await Sale.findOneAndUpdate(
 **Problem:** How to handle payment processing time?
 
 **Solution:** Time-limited holds (15 minutes)
+
 - Prevents indefinite inventory locks
 - Gives users time to complete payment
 - Automatically releases on timeout
@@ -672,17 +696,18 @@ await Sale.findOneAndUpdate(
 
 ### 5. Trade-offs & Limitations
 
-| Decision | Trade-off | Mitigation |
-|----------|-----------|------------|
-| Single worker concurrency | Slower processing | Horizontal scaling of workers |
-| MongoDB (no ACID across collections) | Complex transaction logic | Atomic operations + idempotency |
-| Redis for holds | Memory-bound | TTL-based expiration, monitoring |
-| No payment gateway integration | Simplified demo | Mock payment in frontend |
-| Email-based identity | No authentication required | Easy to add auth layer later |
+| Decision                             | Trade-off                  | Mitigation                       |
+| ------------------------------------ | -------------------------- | -------------------------------- |
+| Single worker concurrency            | Slower processing          | Horizontal scaling of workers    |
+| MongoDB (no ACID across collections) | Complex transaction logic  | Atomic operations + idempotency  |
+| Redis for holds                      | Memory-bound               | TTL-based expiration, monitoring |
+| No payment gateway integration       | Simplified demo            | Mock payment in frontend         |
+| Email-based identity                 | No authentication required | Easy to add auth layer later     |
 
 ### 6. Production Considerations
 
 **Not Implemented (Future Work):**
+
 - Distributed worker cluster
 - Database sharding
 - CDN for static assets
@@ -694,6 +719,7 @@ await Sale.findOneAndUpdate(
 - Backup and disaster recovery
 
 **Scalability Path:**
+
 ```
 Current: 50 holds/second × 1 worker = 50 tps
 
@@ -709,11 +735,13 @@ Scale to 1000 tps:
 ### Queue Status
 
 Check queue overview:
+
 ```bash
 GET /orders/admin/queue/:saleId/overview
 ```
 
 Response:
+
 ```json
 {
   "totalInQueue": 234,
@@ -725,11 +753,13 @@ Response:
 ### Redis CLI
 
 Connect to Redis:
+
 ```bash
 docker exec -it flash-sale-redis redis-cli -a redispass
 ```
 
 Useful commands:
+
 ```redis
 # Check queue size
 ZCARD fsq:<saleId>
@@ -747,11 +777,13 @@ KEYS fsh:*
 ### MongoDB Queries
 
 Connect to MongoDB:
+
 ```bash
 docker exec -it flash-sale-mongo mongosh -u root -p example
 ```
 
 Useful queries:
+
 ```javascript
 use flash_sale_db
 

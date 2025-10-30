@@ -1,15 +1,28 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useSession } from '../../lib/auth/auth-client';
-import { useRouter } from 'next/navigation';
+import React, { useEffect, useState } from 'react';
+import { useRouter, usePathname } from 'next/navigation';
+import { useBearerSession } from '@/lib/auth/use-bearer-session';
+
+const PUBLIC_ROUTES = new Set(['/login']);
 
 export function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { data: session, isPending } = useSession();
+  const pathname = usePathname();
+  const isPublic = PUBLIC_ROUTES.has(pathname);
+
+  const { data: session, isPending } = useBearerSession();
   const router = useRouter();
-  const [isChecking, setIsChecking] = useState(true);
+
+  // start "checking" only for protected routes
+  const [isChecking, setIsChecking] = useState(() => !isPublic);
 
   useEffect(() => {
+    // If this is a public route, skip auth checks
+    if (isPublic) {
+      setIsChecking(false);
+      return;
+    }
+
     if (!isPending) {
       if (!session) {
         router.push('/login');
@@ -17,22 +30,21 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
         setIsChecking(false);
       }
     }
-  }, [session, isPending, router]);
+  }, [isPublic, isPending, session, router]);
 
+  // Public routes: render immediately
+  if (isPublic) return <>{children}</>;
+
+  // Protected routes: show loader while checking
   if (isPending || isChecking) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading...</p>
-        </div>
+      <div className="min-h-screen flex items-center justify-center">
+        Loading...
       </div>
     );
   }
 
-  if (!session) {
-    return null;
-  }
+  if (!session) return null;
 
   return <>{children}</>;
 }

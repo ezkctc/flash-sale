@@ -4,27 +4,42 @@ services:
   redis:
     image: redis:7-alpine
     container_name: flash-sale-redis
-    ports:
-      - "6379:6379"
     command: redis-server --appendonly yes --requirepass redispass
-    healthcheck:
-      test: ["CMD", "redis-cli", "--raw", "PING"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+    ports:
+      - '6379:6379'
     volumes:
       - redis_data:/data
+    healthcheck:
+      # Authenticate before PING; without -a this fails with NOAUTH
+      test: ['CMD-SHELL', 'redis-cli -a redispass --raw PING | grep -q PONG']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+    restart: unless-stopped
 
   mongo:
     image: mongo:7
     container_name: flash-sale-mongo
     ports:
-      - "27017:27017"
+      - '27017:27017'
     environment:
       MONGO_INITDB_ROOT_USERNAME: root
       MONGO_INITDB_ROOT_PASSWORD: example
     volumes:
       - mongo_data:/data/db
+    healthcheck:
+      # Wait until Mongo responds to ping as the root user
+      test:
+        [
+          'CMD-SHELL',
+          'mongosh --quiet -u root -p example --eval "db.adminCommand(''ping'').ok" | grep -q 1',
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 40
+      start_period: 10s
+    restart: unless-stopped
 
   # --- Backend API ---
   api:
@@ -33,12 +48,19 @@ services:
       dockerfile: apps/api/Dockerfile
     container_name: flash-sale-api
     ports:
-      - "4300:4300"
+      - '4300:4300'
     env_file:
       - .env
+    environment:
+      # Fallbacks if not provided in .env
+      MONGO_URL: ${MONGO_URL:-mongodb://root:example@mongo:27017/?authSource=admin}
+      REDIS_URL: ${REDIS_URL:-redis://:redispass@redis:6379}
     depends_on:
-      - mongo
-      - redis
+      redis:
+        condition: service_healthy
+      mongo:
+        condition: service_healthy
+    restart: unless-stopped
 
   # --- Worker ---
   worker:
@@ -48,9 +70,15 @@ services:
     container_name: flash-sale-worker
     env_file:
       - .env
+    environment:
+      MONGO_URL: ${MONGO_URL:-mongodb://root:example@mongo:27017/?authSource=admin}
+      REDIS_URL: ${REDIS_URL:-redis://:redispass@redis:6379}
     depends_on:
-      - mongo
-      - redis
+      redis:
+        condition: service_healthy
+      mongo:
+        condition: service_healthy
+    restart: unless-stopped
 
   # --- Admin Frontend (Next.js) ---
   admin-web:
@@ -59,11 +87,13 @@ services:
       dockerfile: apps/admin-web/Dockerfile
     container_name: flash-sale-admin-web
     ports:
-      - "4200:3000"
+      - '4200:3000'
     env_file:
       - .env
     depends_on:
-      - api
+      api:
+        condition: service_started
+    restart: unless-stopped
 
   # --- Public Site (Next.js) ---
   site-web:
@@ -72,11 +102,13 @@ services:
       dockerfile: apps/site-web/Dockerfile
     container_name: flash-sale-site-web
     ports:
-      - "4201:3000"
+      - '4201:3000'
     env_file:
       - .env
     depends_on:
-      - api
+      api:
+        condition: service_started
+    restart: unless-stopped
 
 volumes:
   redis_data:

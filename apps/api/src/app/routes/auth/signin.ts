@@ -1,4 +1,5 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
+import { fromNodeHeaders } from 'better-auth/node';
 
 type SignInBody = {
   email: string;
@@ -9,7 +10,7 @@ type SignInBody = {
 
 export default async function (fastify: FastifyInstance) {
   fastify.post<{ Body: SignInBody }>(
-    '/sign-in/email',
+    '/sign-in/email', // <-- put it under /auth for consistency with the client
     {
       schema: {
         tags: ['Auth'],
@@ -30,29 +31,54 @@ export default async function (fastify: FastifyInstance) {
       reply: FastifyReply
     ) {
       try {
-        // Forward essential headers so cookies/origin are respected
-        const headers = {
-          cookie: request.headers.cookie ?? '',
-          origin: (request.headers.origin ??
-            request.headers.referer ??
-            '') as string,
-          'user-agent': (request.headers['user-agent'] ?? '') as string,
-        };
+        const headers = fromNodeHeaders({
+          ...request.headers,
+          'x-forwarded-host':
+            (request.headers['x-forwarded-host'] as string) ??
+            request.headers.host ??
+            '',
+          'x-forwarded-proto':
+            (request.headers['x-forwarded-proto'] as string) ??
+            // @ts-ignore fastify types
+            request.protocol ??
+            'http',
+        });
 
         const result: any = await fastify.auth.api.signInEmail({
           body: request.body,
           headers,
         });
 
-        // If the API method returns response headers (e.g., Set-Cookie), mirror them
-        if (result?.headers)
-          reply.headers(result.headers as Record<string, any>);
+        const payload = result?.body ?? result;
+        if (!payload?.token || !payload?.user) {
+          fastify.log.error({ payload: result }, 'No token/user from signInEmail');
+          return reply.code(401).send({ message: 'Invalid credentials' });
+        }
 
-        // result.body if present (some versions) else result directly
-        reply.code(200).send(result?.body ?? result);
+        // Persist bearer token session
+        const now = new Date();
+        const ttlHours = request.body.rememberMe ? 24 * 30 : 24;
+        const expiresAt = new Date(now.getTime() + ttlHours * 3600 * 1000);
+        await fastify.mongo.db.collection('sessions').updateOne(
+          { token: payload.token },
+          {
+            $set: {
+              token: payload.token,
+              userId: payload.user.id,
+              email: payload.user.email,
+              name: payload.user.name,
+              createdAt: now,
+              expiresAt,
+            },
+          },
+          { upsert: true }
+        );
+
+        reply.header('Cache-Control', 'no-store');
+        return reply.code(200).send({ token: payload.token, user: payload.user });
       } catch (error) {
         request.log.error(error);
-        reply.status(401).send({ message: 'Failed to sign in' });
+        return reply.status(401).send({ message: 'Failed to sign in' });
       }
     }
   );

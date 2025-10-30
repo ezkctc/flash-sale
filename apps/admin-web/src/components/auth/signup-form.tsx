@@ -1,98 +1,89 @@
 'use client';
 
-import { useState } from 'react';
-import { signUp } from '../../lib/auth/auth-client';
+import React, { useState } from 'react';
+import { Form, Input, Button, Card } from 'antd';
+import { authClient } from '@/lib/auth/auth-client';
+import { toast } from 'react-toastify';
 
 export function SignupForm() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [name, setName] = useState('');
-  const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
+  const handleSubmit = async (values: {
+    name: string;
+    email: string;
+    password: string;
+  }) => {
     setLoading(true);
 
     try {
-      const result = await signUp.email({
-        email,
-        password,
-        name,
+      const result = await authClient.signUp.email({
+        name: values.name,
+        email: values.email,
+        password: values.password,
       });
 
       if (result.error) {
-        setError(result.error.message || 'Failed to sign up');
+        toast.error(result.error.message || 'Failed to sign up');
       } else {
-        window.location.href = '/dashboard';
+        toast.success('Account created successfully!');
+        window.location.href = '/login';
       }
     } catch (err) {
-      setError('An unexpected error occurred');
+      console.error(err);
+      toast.error('An unexpected error occurred');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div>
-        <label htmlFor="name" className="block text-sm font-medium mb-1">
-          Name
-        </label>
-        <input
-          id="name"
-          type="text"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          required
-          className="w-full px-3 py-2 border border-gray-300 rounded-md"
-          disabled={loading}
-        />
-      </div>
+    <div className="flex justify-center items-center min-h-screen bg-gray-50">
+      <Card title="Create an Account" className="w-full max-w-sm shadow-md">
+        <Form layout="vertical" onFinish={handleSubmit}>
+          <Form.Item
+            name="name"
+            label="Full Name"
+            rules={[{ required: true, message: 'Please enter your name' }]}
+          >
+            <Input placeholder="John Doe" disabled={loading} />
+          </Form.Item>
 
-      <div>
-        <label htmlFor="email" className="block text-sm font-medium mb-1">
-          Email
-        </label>
-        <input
-          id="email"
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          required
-          className="w-full px-3 py-2 border border-gray-300 rounded-md"
-          disabled={loading}
-        />
-      </div>
+          <Form.Item
+            name="email"
+            label="Email"
+            rules={[
+              { required: true, message: 'Please enter your email' },
+              { type: 'email', message: 'Enter a valid email address' },
+            ]}
+          >
+            <Input placeholder="you@example.com" disabled={loading} />
+          </Form.Item>
 
-      <div>
-        <label htmlFor="password" className="block text-sm font-medium mb-1">
-          Password
-        </label>
-        <input
-          id="password"
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          required
-          minLength={8}
-          className="w-full px-3 py-2 border border-gray-300 rounded-md"
-          disabled={loading}
-        />
-      </div>
+          <Form.Item
+            name="password"
+            label="Password"
+            rules={[
+              { required: true, message: 'Please enter your password' },
+              { min: 8, message: 'Password must be at least 8 characters' },
+            ]}
+          >
+            <Input.Password placeholder="••••••••" disabled={loading} />
+          </Form.Item>
 
-      {error && (
-        <div className="text-red-600 text-sm">{error}</div>
-      )}
+          <Form.Item>
+            <Button type="primary" htmlType="submit" loading={loading} block>
+              Sign Up
+            </Button>
+          </Form.Item>
+        </Form>
 
-      <button
-        type="submit"
-        disabled={loading}
-        className="w-full py-2 px-4 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
-      >
-        {loading ? 'Signing up...' : 'Sign Up'}
-      </button>
-    </form>
+        <div className="text-center text-sm text-gray-600 mt-2">
+          Already have an account?{' '}
+          <a href="/login" className="text-blue-600 hover:underline">
+            Sign in
+          </a>
+        </div>
+      </Card>
+    </div>
   );
 }
