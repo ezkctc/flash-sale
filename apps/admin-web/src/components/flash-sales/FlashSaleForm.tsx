@@ -23,8 +23,9 @@ export function FlashSaleForm({ initial, onChange, isEditing = false }: Props) {
       ? [dayjs(initial.startsAt), dayjs(initial.endsAt)]
       : [defaultStart, defaultEnd];
 
-  // For editing, use the current starting quantity as minimum
+  // For editing, use the current quantities as minimums
   const minStartingQuantity = isEditing ? (initial?.startingQuantity || 0) : 1;
+  const minCurrentQuantity = isEditing ? (initial?.currentQuantity || 0) : 1;
 
   const disabledDate = (current: Dayjs) => {
     // Block all calendar dates before today
@@ -97,6 +98,7 @@ export function FlashSaleForm({ initial, onChange, isEditing = false }: Props) {
         description: initial?.description,
         period: initialPeriod,
         startingQuantity: initial?.startingQuantity ?? 1,
+        currentQuantity: initial?.currentQuantity ?? 1,
       }}
       onValuesChange={(_, all) => {
         const period: [Dayjs, Dayjs] | undefined = all.period;
@@ -135,16 +137,6 @@ export function FlashSaleForm({ initial, onChange, isEditing = false }: Props) {
         />
       </Form.Item>
 
-      {isEditing && initial?.currentQuantity !== undefined && (
-        <Form.Item label="Current Inventory">
-          <div style={{ padding: '4px 11px', backgroundColor: '#f5f5f5', borderRadius: '6px' }}>
-            <Text strong>{initial.currentQuantity} remaining</Text>
-            <Text type="secondary" style={{ marginLeft: 8 }}>
-              (Cannot be modified)
-            </Text>
-          </div>
-        </Form.Item>
-      )}
 
       <Form.Item
         name="startingQuantity"
@@ -158,9 +150,20 @@ export function FlashSaleForm({ initial, onChange, isEditing = false }: Props) {
         />
       </Form.Item>
 
+      <Form.Item
+        name="currentQuantity"
+        label={isEditing ? "Current Inventory (can only increase)" : "Current Inventory"}
+        rules={[{ required: true }]}
+      >
+        <InputNumber 
+          min={minCurrentQuantity} 
+          className="w-full"
+          placeholder={isEditing ? `Minimum: ${minCurrentQuantity}` : "Enter quantity"}
+        />
+      </Form.Item>
       {isEditing && (
         <Text type="secondary" style={{ fontSize: '12px' }}>
-          * Starting inventory can only be increased to add more items to the sale
+          * Both starting and current inventory can only be increased to add more items to the sale
         </Text>
       )}
     </Form>

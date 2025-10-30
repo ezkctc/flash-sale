@@ -103,17 +103,13 @@ export function FlashSalesManager() {
         startsAt: dayjs(formValues.startsAt).toISOString(),
         endsAt: dayjs(formValues.endsAt).toISOString(),
         startingQuantity: Number(formValues.startingQuantity ?? 0),
+        currentQuantity: Number(formValues.currentQuantity ?? 0),
         status: editing?.status,
       };
 
-      // For new flash sales, set currentQuantity = startingQuantity
-      // For editing, don't include currentQuantity (let backend handle it)
-      const payload: FlashSaleShape = editing?._id 
-        ? basePayload as FlashSaleShape
-        : { 
-            ...basePayload, 
-            currentQuantity: Number(formValues.startingQuantity ?? 0) 
-          } as FlashSaleShape;
+      // For new flash sales, use the form values
+      // For editing, both quantities can be increased
+      const payload: FlashSaleShape = basePayload as FlashSaleShape;
 
       if (editing?._id) {
         await updateFlashSale(editing._id, payload);
