@@ -18,13 +18,15 @@ interface FlashSaleCardProps {
   item: FlashSaleItem | null;
   meta: FlashSaleMeta;
   userEmail: string;
-  onBuy: () => void;
+  queueStatus: QueuePosition | null;
+  onBuy: (position: QueuePosition) => void;
 }
 
 export function FlashSaleCard({
   item,
   meta,
   userEmail,
+  queueStatus,
   onBuy,
 }: FlashSaleCardProps) {
   const [buying, setBuying] = useState(false);
@@ -58,7 +60,7 @@ export function FlashSaleCard({
         );
       }
 
-      onBuy();
+      onBuy(result);
     } catch (error: any) {
       toast.error(error.message || 'Failed to place order');
     } finally {
@@ -90,6 +92,13 @@ export function FlashSaleCard({
   const soldCount = meta.progress
     ? meta.progress.starting - meta.progress.remaining
     : 0;
+
+  // Determine if user should see buy button or is already in queue
+  const isInQueue = queueStatus && queueStatus.size > 0;
+  const canPurchase = queueStatus && 
+    queueStatus.position && 
+    meta.progress && 
+    queueStatus.position <= meta.progress.remaining;
 
   return (
     <Card
@@ -144,7 +153,7 @@ export function FlashSaleCard({
       )}
 
       <div style={{ textAlign: 'center' }}>
-        {meta.status === 'ongoing' && !meta.soldOut ? (
+        {meta.status === 'ongoing' && !meta.soldOut && !isInQueue ? (
           <Button
             type="primary"
             size="large"
@@ -161,6 +170,15 @@ export function FlashSaleCard({
             block
           >
             {buying ? 'Adding to Queue...' : 'Buy Now'}
+          </Button>
+        ) : isInQueue ? (
+          <Button
+            size="large"
+            disabled
+            style={{ height: 50, fontSize: 16, borderRadius: 8 }}
+            block
+          >
+            {canPurchase ? 'In Queue - Ready to Pay' : 'In Queue - Waiting'}
           </Button>
         ) : meta.soldOut ? (
           <Button

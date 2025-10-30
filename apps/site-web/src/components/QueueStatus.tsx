@@ -5,7 +5,7 @@ import { Card, Typography, Space, Tag, Button, Spin } from 'antd';
 import { ClockCircleOutlined, CheckCircleOutlined, ReloadOutlined } from '@ant-design/icons';
 import { toast } from 'react-toastify';
 
-import type { QueuePosition } from '@/types';
+import type { QueuePosition, FlashSaleResponse } from '@/types';
 import { queueService } from '@/services';
 import { timeUtil } from '@/utils';
 
@@ -14,10 +14,12 @@ const { Title, Text } = Typography;
 interface QueueStatusProps {
   userEmail: string;
   flashSaleId: string;
+  flashSale: FlashSaleResponse;
+  initialPosition: QueuePosition;
 }
 
-export function QueueStatus({ userEmail, flashSaleId }: QueueStatusProps) {
-  const [position, setPosition] = useState<QueuePosition | null>(null);
+export function QueueStatus({ userEmail, flashSaleId, flashSale, initialPosition }: QueueStatusProps) {
+  const [position, setPosition] = useState<QueuePosition | null>(initialPosition);
   const [loading, setLoading] = useState(false);
   const [confirming, setConfirming] = useState(false);
 
@@ -36,11 +38,7 @@ export function QueueStatus({ userEmail, flashSaleId }: QueueStatusProps) {
   const handleConfirmPayment = async () => {
     setConfirming(true);
     try {
-      const result = await queueService.confirmPayment({
-        email: userEmail,
-        flashSaleId: flashSaleId,
-        totalAmount: 99.99, // Mock amount
-      });
+      const result = await queueService.confirmPayment(userEmail, flashSaleId, 1);
 
       toast.success(`Payment confirmed! Order ID: ${result.orderId}`);
       fetchPosition(); // Refresh status
@@ -82,6 +80,11 @@ export function QueueStatus({ userEmail, flashSaleId }: QueueStatusProps) {
   const holdSeconds = position.holdTtlSec % 60;
   const holdTimeFormatted = timeUtil.formatDuration(position.holdTtlSec);
 
+  // Check if user can purchase based on position vs remaining inventory
+  const canPurchase = position.position && 
+    flashSale.meta.progress && 
+    position.position <= flashSale.meta.progress.remaining;
+
   return (
     <Card
       style={{
@@ -89,7 +92,9 @@ export function QueueStatus({ userEmail, flashSaleId }: QueueStatusProps) {
         borderRadius: 16,
         background: position.hasActiveHold 
           ? 'linear-gradient(135deg, #52c41a 0%, #73d13d 100%)'
-          : 'linear-gradient(135deg, #faad14 0%, #ffc53d 100%)',
+          : canPurchase 
+            ? 'linear-gradient(135deg, #1890ff 0%, #36cfc9 100%)'
+            : 'linear-gradient(135deg, #faad14 0%, #ffc53d 100%)',
         border: 'none',
         color: 'white',
       }}
@@ -119,7 +124,33 @@ export function QueueStatus({ userEmail, flashSaleId }: QueueStatusProps) {
                   fontSize: 16,
                 }}
               >
-                {confirming ? 'Processing Payment...' : 'Confirm Payment ($99.99)'}
+                {confirming ? 'Processing Payment...' : 'Confirm Payment ($1.00)'}
+              </Button>
+            </>
+          ) : canPurchase ? (
+            <>
+              <CheckCircleOutlined style={{ fontSize: 48 }} />
+              <div>
+                <Title level={3} style={{ color: 'white', margin: 0 }}>
+                  Ready to Purchase!
+                </Title>
+                <Text style={{ color: 'rgba(255,255,255,0.9)', fontSize: 16 }}>
+                  Position #{position.position} of {position.size} - You can buy this item!
+                </Text>
+              </div>
+              <Button
+                type="primary"
+                size="large"
+                onClick={handleConfirmPayment}
+                loading={confirming}
+                style={{
+                  backgroundColor: 'rgba(255,255,255,0.2)',
+                  borderColor: 'rgba(255,255,255,0.3)',
+                  height: 50,
+                  fontSize: 16,
+                }}
+              >
+                {confirming ? 'Processing Payment...' : 'Pay Now ($1.00)'}
               </Button>
             </>
           ) : (
@@ -127,11 +158,11 @@ export function QueueStatus({ userEmail, flashSaleId }: QueueStatusProps) {
               <ClockCircleOutlined style={{ fontSize: 48 }} />
               <div>
                 <Title level={3} style={{ color: 'white', margin: 0 }}>
-                  You're in the Queue!
+                  Waiting in Queue
                 </Title>
                 {position.position ? (
                   <Text style={{ color: 'rgba(255,255,255,0.9)', fontSize: 16 }}>
-                    Position #{position.position} of {position.size}
+                    Position #{position.position} of {position.size} - Not enough inventory yet
                   </Text>
                 ) : (
                   <Text style={{ color: 'rgba(255,255,255,0.9)', fontSize: 16 }}>

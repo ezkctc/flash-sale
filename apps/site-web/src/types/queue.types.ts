@@ -1,3 +1,5 @@
+import type { QueuePosition } from './queue.types';
+
 export interface QueuePosition {
   position: number | null;
   size: number;
@@ -22,7 +24,7 @@ export interface BuyResponse {
 export interface ConfirmPaymentRequest {
   email: string;
   flashSaleId: string;
-  totalAmount: number;
+  totalAmount?: number;
 }
 
 export interface ConfirmPaymentResponse {

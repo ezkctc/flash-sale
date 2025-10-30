@@ -21,7 +21,7 @@ export function FlashSalePage() {
   const [showEmailPrompt, setShowEmailPrompt] = useState(false);
   const [flashSale, setFlashSale] = useState<FlashSaleResponse | null>(null);
   const [loading, setLoading] = useState(false);
-  const [inQueue, setInQueue] = useState(false);
+  const [queueStatus, setQueueStatus] = useState<QueuePosition | null>(null);
 
   // Check for saved email on mount
   useEffect(() => {
@@ -50,10 +50,33 @@ export function FlashSalePage() {
   useEffect(() => {
     if (userEmail) {
       fetchFlashSale();
+      checkQueueStatus();
       const interval = setInterval(fetchFlashSale, 30000); // Refresh every 30 seconds
       return () => clearInterval(interval);
     }
   }, [userEmail]);
+
+  // Check if user is already in queue
+  const checkQueueStatus = async () => {
+    if (!userEmail || !flashSale?.item?._id) return;
+    
+    try {
+      const position = await queueService.getPosition(userEmail, flashSale.item._id);
+      if (position.size > 0) {
+        setQueueStatus(position);
+      }
+    } catch (error) {
+      // User not in queue, which is fine
+      setQueueStatus(null);
+    }
+  };
+
+  // Check queue status when flash sale data changes
+  useEffect(() => {
+    if (userEmail && flashSale?.item?._id) {
+      checkQueueStatus();
+    }
+  }, [userEmail, flashSale?.item?._id]);
 
   const handleEmailSubmit = (email: string) => {
     setUserEmail(email);
@@ -62,14 +85,14 @@ export function FlashSalePage() {
     toast.success('Welcome! Loading flash sales...');
   };
 
-  const handleBuyClick = () => {
-    setInQueue(true);
+  const handleBuyClick = (position: QueuePosition) => {
+    setQueueStatus(position);
   };
 
   const clearEmail = () => {
     storageUtil.clearUserEmail();
     setUserEmail('');
-    setInQueue(false);
+    setQueueStatus(null);
     setShowEmailPrompt(true);
   };
 
@@ -154,14 +177,17 @@ export function FlashSalePage() {
                   item={flashSale.item}
                   meta={flashSale.meta}
                   userEmail={userEmail}
+                  queueStatus={queueStatus}
                   onBuy={handleBuyClick}
                 />
 
                 {/* Show queue status if user is in queue */}
-                {inQueue && flashSale.item && (
+                {queueStatus && queueStatus.size > 0 && flashSale.item && (
                   <QueueStatus
                     userEmail={userEmail}
                     flashSaleId={flashSale.item._id}
+                    flashSale={flashSale}
+                    initialPosition={queueStatus}
                   />
                 )}
               </>
