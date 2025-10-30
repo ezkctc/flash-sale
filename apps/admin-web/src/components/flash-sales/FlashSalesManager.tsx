@@ -97,14 +97,19 @@ export function FlashSalesManager() {
 
   async function handleOk() {
     try {
+      const isEditing = !!editing?._id;
+
       const basePayload = {
         name: formValues.name,
         description: formValues.description,
         startsAt: dayjs(formValues.startsAt).toISOString(),
         endsAt: dayjs(formValues.endsAt).toISOString(),
-        startingQuantity: Number(formValues.startingQuantity ?? 0),
-        currentQuantity: Number(formValues.currentQuantity ?? 0),
         status: editing?.status,
+
+        ...(!isEditing && {
+          startingQuantity: Number(formValues.startingQuantity ?? 0),
+          currentQuantity: Number(formValues.startingQuantity ?? 0),
+        }),
       };
 
       // For new flash sales, use the form values
@@ -165,7 +170,11 @@ export function FlashSalesManager() {
         onCancel={() => setModalOpen(false)}
         destroyOnHidden
       >
-        <FlashSaleForm initial={editing} onChange={setFormValues} />
+        <FlashSaleForm
+          initial={editing}
+          onChange={setFormValues}
+          isEditing={!!editing?._id}
+        />
       </Modal>
     </Card>
   );

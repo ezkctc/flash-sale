@@ -6,8 +6,10 @@ import { ReloadOutlined } from '@ant-design/icons';
 import { toast } from 'react-toastify';
 
 import type { FlashSaleResponse } from '@/types';
-import { flashSaleService } from '@/services';
+import { flashSaleService, queueService } from '@/services';
 import { storageUtil } from '@/utils';
+import { QueuePosition } from '@/types';
+
 import { EmailPrompt } from './EmailPrompt';
 import { CountdownTimer } from './CountdownTimer';
 import { FlashSaleCard } from './FlashSaleCard';
@@ -60,9 +62,12 @@ export function FlashSalePage() {
   // Check if user is already in queue
   const checkQueueStatus = async () => {
     if (!userEmail || !flashSale?.item?._id) return;
-    
+
     try {
-      const position = await queueService.getPosition(userEmail, flashSale.item._id);
+      const position = await queueService.getPosition(
+        userEmail,
+        flashSale.item._id
+      );
       if (position.size > 0) {
         setQueueStatus(position);
       }
