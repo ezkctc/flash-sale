@@ -2,7 +2,11 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { Card, Typography, Space, Tag, Button, Spin } from 'antd';
-import { ClockCircleOutlined, CheckCircleOutlined, ReloadOutlined } from '@ant-design/icons';
+import {
+  ClockCircleOutlined,
+  CheckCircleOutlined,
+  ReloadOutlined,
+} from '@ant-design/icons';
 import { toast } from 'react-toastify';
 
 import type { QueuePosition, FlashSaleResponse } from '@/types';
@@ -17,8 +21,15 @@ interface QueueStatusProps {
   initialPosition: QueuePosition;
 }
 
-export function QueueStatus({ userEmail, flashSaleId, flashSale, initialPosition }: QueueStatusProps) {
-  const [position, setPosition] = useState<QueuePosition | null>(initialPosition);
+export function QueueStatus({
+  userEmail,
+  flashSaleId,
+  flashSale,
+  initialPosition,
+}: QueueStatusProps) {
+  const [position, setPosition] = useState<QueuePosition | null>(
+    initialPosition
+  );
   const [loading, setLoading] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [liveHoldCountdown, setLiveHoldCountdown] = useState(0);
@@ -28,7 +39,7 @@ export function QueueStatus({ userEmail, flashSaleId, flashSale, initialPosition
     try {
       const data = await queueService.getPosition(userEmail, flashSaleId);
       setPosition(data);
-      
+
       // Update hold countdown if user has active hold
       if (data.hasActiveHold && data.holdTtlSec > 0) {
         setLiveHoldCountdown(data.holdTtlSec);
@@ -47,7 +58,7 @@ export function QueueStatus({ userEmail, flashSaleId, flashSale, initialPosition
     if (liveHoldCountdown <= 0) return;
 
     const timer = setInterval(() => {
-      setLiveHoldCountdown(prev => {
+      setLiveHoldCountdown((prev) => {
         const newValue = prev - 1;
         if (newValue <= 0) {
           // Hold expired, refresh position
@@ -64,10 +75,15 @@ export function QueueStatus({ userEmail, flashSaleId, flashSale, initialPosition
   const handleConfirmPayment = async () => {
     setConfirming(true);
     try {
-      const result = await queueService.confirmPayment(userEmail, flashSaleId, 1);
+      const result = await queueService.confirmPayment(
+        userEmail,
+        flashSaleId,
+        1
+      );
 
       toast.success(`Payment confirmed! Order ID: ${result.orderId}`);
       fetchPosition(); // Refresh status
+      location.reload();
     } catch (error: any) {
       if (error.message.includes('expired')) {
         toast.error('Your reservation has expired. Please try again.');
@@ -117,7 +133,7 @@ export function QueueStatus({ userEmail, flashSaleId, flashSale, initialPosition
       style={{
         marginTop: 24,
         borderRadius: 16,
-        background: position.hasActiveHold 
+        background: position.hasActiveHold
           ? 'linear-gradient(135deg, #52c41a 0%, #73d13d 100%)' // Green for active hold
           : 'linear-gradient(135deg, #faad14 0%, #ffc53d 100%)', // Orange for waiting
         border: 'none',
@@ -135,11 +151,19 @@ export function QueueStatus({ userEmail, flashSaleId, flashSale, initialPosition
                   Reservation Confirmed!
                 </Title>
                 {liveHoldCountdown > 0 ? (
-                  <Text style={{ color: 'rgba(255,255,255,0.9)', fontSize: 16 }}>
-                    You have <span style={{ fontWeight: 'bold', fontSize: 18 }}>{holdTimeFormatted}</span> to complete your purchase
+                  <Text
+                    style={{ color: 'rgba(255,255,255,0.9)', fontSize: 16 }}
+                  >
+                    You have{' '}
+                    <span style={{ fontWeight: 'bold', fontSize: 18 }}>
+                      {holdTimeFormatted}
+                    </span>{' '}
+                    to complete your purchase
                   </Text>
                 ) : (
-                  <Text style={{ color: 'rgba(255,255,255,0.9)', fontSize: 16 }}>
+                  <Text
+                    style={{ color: 'rgba(255,255,255,0.9)', fontSize: 16 }}
+                  >
                     Your reservation has expired
                   </Text>
                 )}
@@ -157,7 +181,9 @@ export function QueueStatus({ userEmail, flashSaleId, flashSale, initialPosition
                     fontSize: 16,
                   }}
                 >
-                  {confirming ? 'Processing Payment...' : 'Confirm Payment ($1.00)'}
+                  {confirming
+                    ? 'Processing Payment...'
+                    : 'Confirm Payment ($1.00)'}
                 </Button>
               ) : (
                 <Button
@@ -184,7 +210,8 @@ export function QueueStatus({ userEmail, flashSaleId, flashSale, initialPosition
                   Waiting in Queue
                 </Title>
                 <Text style={{ color: 'rgba(255,255,255,0.9)', fontSize: 16 }}>
-                  Position #{position.position} of {position.size} - Waiting for your turn
+                  Position #{position.position} of {position.size} - Waiting for
+                  your turn
                 </Text>
               </div>
               <Button

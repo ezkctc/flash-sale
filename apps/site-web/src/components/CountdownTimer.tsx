@@ -14,7 +14,11 @@ interface CountdownTimerProps {
   onCountdownComplete?: () => void;
 }
 
-export function CountdownTimer({ targetDate, title, onCountdownComplete }: CountdownTimerProps) {
+export function CountdownTimer({
+  targetDate,
+  title,
+  onCountdownComplete,
+}: CountdownTimerProps) {
   const [timeLeft, setTimeLeft] = useState<TimeLeft>({
     days: 0,
     hours: 0,
@@ -27,16 +31,18 @@ export function CountdownTimer({ targetDate, title, onCountdownComplete }: Count
     const calculateTimeLeft = () => {
       const newTimeLeft = timeUtil.calculateTimeLeft(targetDate);
       setTimeLeft(newTimeLeft);
-      
+
       // Check if countdown just completed
-      const isComplete = newTimeLeft.days === 0 && 
-                        newTimeLeft.hours === 0 && 
-                        newTimeLeft.minutes === 0 && 
-                        newTimeLeft.seconds === 0;
-      
+      const isComplete =
+        newTimeLeft.days === 0 &&
+        newTimeLeft.hours === 0 &&
+        newTimeLeft.minutes === 0 &&
+        newTimeLeft.seconds === 0;
+
       if (isComplete && !hasCompleted) {
         setHasCompleted(true);
         onCountdownComplete?.();
+        window.location.reload();
       }
     };
 
@@ -61,10 +67,17 @@ export function CountdownTimer({ targetDate, title, onCountdownComplete }: Count
           {title}
         </Title>
       </div>
-      
+
       <Row gutter={16}>
         <Col span={6}>
-          <Card size="small" style={{ textAlign: 'center', backgroundColor: 'rgba(255,255,255,0.1)', border: 'none' }}>
+          <Card
+            size="small"
+            style={{
+              textAlign: 'center',
+              backgroundColor: 'rgba(255,255,255,0.1)',
+              border: 'none',
+            }}
+          >
             <Statistic
               value={timeLeft.days}
               suffix="Days"
@@ -73,7 +86,14 @@ export function CountdownTimer({ targetDate, title, onCountdownComplete }: Count
           </Card>
         </Col>
         <Col span={6}>
-          <Card size="small" style={{ textAlign: 'center', backgroundColor: 'rgba(255,255,255,0.1)', border: 'none' }}>
+          <Card
+            size="small"
+            style={{
+              textAlign: 'center',
+              backgroundColor: 'rgba(255,255,255,0.1)',
+              border: 'none',
+            }}
+          >
             <Statistic
               value={timeLeft.hours}
               suffix="Hours"
@@ -82,7 +102,14 @@ export function CountdownTimer({ targetDate, title, onCountdownComplete }: Count
           </Card>
         </Col>
         <Col span={6}>
-          <Card size="small" style={{ textAlign: 'center', backgroundColor: 'rgba(255,255,255,0.1)', border: 'none' }}>
+          <Card
+            size="small"
+            style={{
+              textAlign: 'center',
+              backgroundColor: 'rgba(255,255,255,0.1)',
+              border: 'none',
+            }}
+          >
             <Statistic
               value={timeLeft.minutes}
               suffix="Minutes"
@@ -91,7 +118,14 @@ export function CountdownTimer({ targetDate, title, onCountdownComplete }: Count
           </Card>
         </Col>
         <Col span={6}>
-          <Card size="small" style={{ textAlign: 'center', backgroundColor: 'rgba(255,255,255,0.1)', border: 'none' }}>
+          <Card
+            size="small"
+            style={{
+              textAlign: 'center',
+              backgroundColor: 'rgba(255,255,255,0.1)',
+              border: 'none',
+            }}
+          >
             <Statistic
               value={timeLeft.seconds}
               suffix="Seconds"
