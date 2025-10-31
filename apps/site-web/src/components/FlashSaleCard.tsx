@@ -20,6 +20,7 @@ interface FlashSaleCardProps {
   userEmail: string;
   queueStatus: any | null;
   onBuy: (position: any) => void;
+  countdownCompleted?: boolean;
 }
 
 export function FlashSaleCard({
@@ -28,6 +29,7 @@ export function FlashSaleCard({
   userEmail,
   queueStatus,
   onBuy,
+  countdownCompleted = false,
 }: FlashSaleCardProps) {
   const [buying, setBuying] = useState(false);
 
@@ -101,6 +103,11 @@ export function FlashSaleCard({
     meta.progress &&
     queueStatus.position <= meta.progress.remaining;
 
+  // Allow buying if countdown completed and there's inventory, even if status is still 'upcoming'
+  const canBuyNow = (meta.status === 'ongoing' || (meta.status === 'upcoming' && countdownCompleted)) && 
+                    !meta.soldOut && 
+                    !isInQueue;
+
   return (
     <Card
       style={{
@@ -153,7 +160,7 @@ export function FlashSaleCard({
       )}
 
       <div style={{ textAlign: 'center' }}>
-        {meta.status === 'ongoing' && !meta.soldOut && !isInQueue ? (
+        {canBuyNow ? (
           <Button
             type="primary"
             size="large"
@@ -210,7 +217,7 @@ export function FlashSaleCard({
         )}
       </div>
 
-      {meta.status === 'ongoing' && (
+      {(meta.status === 'ongoing' || (meta.status === 'upcoming' && countdownCompleted)) && (
         <div style={{ textAlign: 'center', marginTop: 16 }}>
           <Text type="secondary" style={{ fontSize: 12 }}>
             Sale ends: {new Date(meta.endsAt!).toLocaleString()}

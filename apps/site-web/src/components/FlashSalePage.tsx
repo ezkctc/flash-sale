@@ -25,6 +25,7 @@ export function FlashSalePage() {
   const [flashSale, setFlashSale] = useState<FlashSaleResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [queueStatus, setQueueStatus] = useState<QueuePosition | null>(null); // Check for saved email on mount
+  const [countdownCompleted, setCountdownCompleted] = useState(false);
 
   useEffect(() => {
     const savedEmail = storageUtil.getUserEmail();
@@ -40,6 +41,11 @@ export function FlashSalePage() {
     try {
       const data = await flashSaleService.getCurrentSale();
       setFlashSale(data);
+      
+      // Reset countdown completion if we get a new sale
+      if (data.meta.status === 'upcoming') {
+        setCountdownCompleted(false);
+      }
     } catch (error: any) {
       toast.error(error.message || 'Failed to load flash sale');
     } finally {
@@ -90,6 +96,13 @@ export function FlashSalePage() {
 
   const handleBuyClick = (position: QueuePosition) => {
     setQueueStatus(position);
+  };
+
+  const handleCountdownComplete = () => {
+    setCountdownCompleted(true);
+    // Refresh flash sale data to get updated status
+    fetchFlashSale();
+    toast.success('🎉 Flash sale is now live!');
   };
 
   const clearEmail = () => {
@@ -169,6 +182,7 @@ export function FlashSalePage() {
                     <CountdownTimer
                       targetDate={flashSale.meta.startsAt}
                       title="Sale Starts In"
+                      onCountdownComplete={handleCountdownComplete}
                     />
                   )}
                 {/* Show flash sale card */}
@@ -178,6 +192,7 @@ export function FlashSalePage() {
                   userEmail={userEmail}
                   queueStatus={queueStatus}
                   onBuy={handleBuyClick}
+                  countdownCompleted={countdownCompleted}
                 />
                 {/* Show queue status if user is in queue */}
                 {queueStatus && queueStatus.size > 0 && flashSale.item && (

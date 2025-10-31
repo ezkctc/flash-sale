@@ -11,26 +11,40 @@ const { Title } = Typography;
 interface CountdownTimerProps {
   targetDate: string;
   title: string;
+  onCountdownComplete?: () => void;
 }
 
-export function CountdownTimer({ targetDate, title }: CountdownTimerProps) {
+export function CountdownTimer({ targetDate, title, onCountdownComplete }: CountdownTimerProps) {
   const [timeLeft, setTimeLeft] = useState<TimeLeft>({
     days: 0,
     hours: 0,
     minutes: 0,
     seconds: 0,
   });
+  const [hasCompleted, setHasCompleted] = useState(false);
 
   useEffect(() => {
     const calculateTimeLeft = () => {
-      setTimeLeft(timeUtil.calculateTimeLeft(targetDate));
+      const newTimeLeft = timeUtil.calculateTimeLeft(targetDate);
+      setTimeLeft(newTimeLeft);
+      
+      // Check if countdown just completed
+      const isComplete = newTimeLeft.days === 0 && 
+                        newTimeLeft.hours === 0 && 
+                        newTimeLeft.minutes === 0 && 
+                        newTimeLeft.seconds === 0;
+      
+      if (isComplete && !hasCompleted) {
+        setHasCompleted(true);
+        onCountdownComplete?.();
+      }
     };
 
     calculateTimeLeft();
     const timer = setInterval(calculateTimeLeft, 1000);
 
     return () => clearInterval(timer);
-  }, [targetDate]);
+  }, [targetDate, hasCompleted, onCountdownComplete]);
 
   return (
     <Card
