@@ -18,7 +18,10 @@
     "seed:admin": "tsx apps/api/src/seed-admin.ts",
     "auth:reset": "node scripts/reset-better-auth.js",
     "redis:reset": "node scripts/reset-redis.js",
-    "redis:reset-all": "node scripts/reset-redis-full.js"
+    "redis:reset-all": "node scripts/reset-redis-full.js",
+    "redis:show": "node scripts/redis-display.js",
+    "redis:monitor": "node scripts/redis-monitor.js monitor",
+    "redis:watch": "node scripts/redis-monitor.js watch"
   },
   "private": true,
   "devDependencies": {
