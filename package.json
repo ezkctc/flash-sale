@@ -21,7 +21,8 @@
     "redis:reset-all": "node scripts/reset-redis-full.js",
     "redis:show": "node scripts/redis-display.js",
     "redis:monitor": "node scripts/redis-monitor.js monitor",
-    "redis:watch": "node scripts/redis-monitor.js watch"
+    "redis:watch": "node scripts/redis-monitor.js watch",
+    "db:investigate": "node scripts/check-deletion-sources.js"
   },
   "private": true,
   "devDependencies": {
