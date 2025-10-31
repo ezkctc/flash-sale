@@ -103,10 +103,15 @@ export function FlashSaleCard({
     meta.progress &&
     queueStatus.position <= meta.progress.remaining;
 
-  // Allow buying if countdown completed and there's inventory, even if status is still 'upcoming'
-  const canBuyNow = (meta.status === 'ongoing' || (meta.status === 'upcoming' && countdownCompleted)) && 
-                    !meta.soldOut && 
-                    !isInQueue;
+  // Allow buying if:
+  // 1. Sale is ongoing, OR
+  // 2. Sale is upcoming but countdown completed (immediate activation)
+  // 3. Not sold out and user not in queue
+  const canBuyNow = 
+    ((meta.status === 'ongoing') || 
+     (meta.status === 'upcoming' && countdownCompleted)) && 
+    !meta.soldOut && 
+    !isInQueue;
 
   return (
     <Card
@@ -205,7 +210,7 @@ export function FlashSaleCard({
           >
             Sale Ended
           </Button>
-        ) : (
+        ) : meta.status === 'upcoming' && !countdownCompleted ? (
           <Button
             size="large"
             disabled
@@ -214,10 +219,19 @@ export function FlashSaleCard({
           >
             Coming Soon
           </Button>
+        ) : (
+          <Button
+            size="large"
+            disabled
+            style={{ height: 50, fontSize: 16, borderRadius: 8 }}
+            block
+          >
+            Not Available
+          </Button>
         )}
       </div>
 
-      {(meta.status === 'ongoing' || (meta.status === 'upcoming' && countdownCompleted)) && (
+      {((meta.status === 'ongoing') || (meta.status === 'upcoming' && countdownCompleted)) && (
         <div style={{ textAlign: 'center', marginTop: 16 }}>
           <Text type="secondary" style={{ fontSize: 12 }}>
             Sale ends: {new Date(meta.endsAt!).toLocaleString()}
