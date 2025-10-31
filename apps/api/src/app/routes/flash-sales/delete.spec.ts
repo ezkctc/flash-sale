@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import Fastify, { FastifyInstance } from 'fastify';
 import deleteRoute from './delete';
+import { Db } from 'mongodb'; // Import Db for context, though we mock it
 
 vi.mock('@flash-sale/shared-types', async () => {
   const actual = await vi.importActual('@flash-sale/shared-types');
@@ -22,7 +23,8 @@ describe('Flash Sales - Delete Route', () => {
   beforeEach(async () => {
     vi.clearAllMocks();
     app = Fastify();
-    app.decorate('mongo', { db: {} });
+    // FIX: Using 'as any' on the decorated object to bypass strict Db typing for the test mock.
+    app.decorate('mongo', { db: {} } as any);
     await app.register(deleteRoute);
     await app.ready();
   });

@@ -1,8 +1,10 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import Fastify, { FastifyInstance } from 'fastify';
 import createRoute from './create';
 import { FlashSaleStatus } from '@flash-sale/shared-types';
+import { Db } from 'mongodb';
 
+// Mock the MongoDB model calls to isolate the route logic
 vi.mock('@flash-sale/shared-types', async () => {
   const actual = await vi.importActual('@flash-sale/shared-types');
   return {
@@ -14,6 +16,7 @@ vi.mock('@flash-sale/shared-types', async () => {
   };
 });
 
+// Mock the auth guard to allow tests to run without real authentication logic
 vi.mock('../auth/auth-guard', () => ({
   authGuard: () => async () => {},
 }));
@@ -24,9 +27,12 @@ describe('Flash Sales - Create Route', () => {
   beforeEach(async () => {
     vi.clearAllMocks();
     app = Fastify();
+
+    // FIX: Using 'as any' on the decorated object to bypass strict Db typing for the test mock.
     app.decorate('mongo', {
       db: {},
-    });
+    } as any);
+
     await app.register(createRoute);
     await app.ready();
   });

@@ -13,7 +13,7 @@ describe('Auth - Sign Up Route', () => {
       api: {
         signUpEmail: vi.fn(),
       },
-    });
+    } as any);
 
     await app.register(signupRoute);
     await app.ready();

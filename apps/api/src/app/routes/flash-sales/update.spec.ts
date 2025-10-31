@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import Fastify, { FastifyInstance } from 'fastify';
 import updateRoute from './update';
 
+// Mock the MongoDB model and its updateOne function
 vi.mock('@flash-sale/shared-types', async () => {
   const actual = await vi.importActual('@flash-sale/shared-types');
   return {
@@ -12,6 +13,7 @@ vi.mock('@flash-sale/shared-types', async () => {
   };
 });
 
+// Mock the auth guard
 vi.mock('../auth/auth-guard', () => ({
   authGuard: () => async () => {},
 }));
@@ -22,7 +24,8 @@ describe('Flash Sales - Update Route', () => {
   beforeEach(async () => {
     vi.clearAllMocks();
     app = Fastify();
-    app.decorate('mongo', { db: {} });
+    // FIX: Using 'as any' on the decorated object to bypass strict Db typing for the test mock.
+    app.decorate('mongo', { db: {} } as any);
     await app.register(updateRoute);
     await app.ready();
   });

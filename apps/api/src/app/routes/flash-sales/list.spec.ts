@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import Fastify, { FastifyInstance } from 'fastify';
 import listRoute from './list';
 
+// Mock the MongoDB model calls and the chainable methods (sort, skip, limit, lean)
 vi.mock('@flash-sale/shared-types', async () => {
   const actual = await vi.importActual('@flash-sale/shared-types');
   return {
@@ -18,6 +19,7 @@ vi.mock('@flash-sale/shared-types', async () => {
   };
 });
 
+// Mock the auth guard to allow tests to run without real authentication logic
 vi.mock('../auth/auth-guard', () => ({
   authGuard: () => async () => {},
 }));
@@ -28,7 +30,8 @@ describe('Flash Sales - List Route', () => {
   beforeEach(async () => {
     vi.clearAllMocks();
     app = Fastify();
-    app.decorate('mongo', { db: {} });
+    // FIX: Using 'as any' on the decorated object to bypass strict Db typing for the test mock.
+    app.decorate('mongo', { db: {} } as any);
     await app.register(listRoute);
     await app.ready();
   });
@@ -47,6 +50,7 @@ describe('Flash Sales - List Route', () => {
         endsAt: new Date(),
       },
     ];
+    // Cast to 'any' for mocking chained functions, as TypeScript doesn't track mockReturnThis well
     (flashSaleMongoModel.find as any)().lean.mockResolvedValue(mockSales);
     (flashSaleMongoModel.countDocuments as any).mockResolvedValue(1);
 
@@ -169,6 +173,8 @@ describe('Flash Sales - List Route', () => {
     expect([200, 400]).toContain(response.statusCode);
     if (response.statusCode === 200) {
       const body = JSON.parse(response.payload);
+      // Assuming a max page size of 100 or 200 is acceptable if the schema allows it.
+      // If the route logic enforces a lower max (e.g., 100), this test should assert against that max.
       expect(body.pageSize).toBe(200);
     }
   });

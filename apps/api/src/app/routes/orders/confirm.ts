@@ -98,9 +98,9 @@ export default async function (app: FastifyInstance) {
         : flashSaleId;
 
       try {
-        // 1) Must have an active hold (treat -1 as active defensively)
-        const pttl = await redis.pttl(holdKey(flashSaleId, email)); // -2 no key, -1 no expiry, >=0(ms)
-        if (!(pttl > 0 || pttl === -1)) {
+        // 1) Must have an active hold
+        const holdVal = await redis.get(holdKey(flashSaleId, email));
+        if (!holdVal) {
           return reply
             .code(403)
             .send({ message: 'No active hold or it has expired' });
@@ -138,7 +138,7 @@ export default async function (app: FastifyInstance) {
           }
 
           const claimPttl = await redis.pttl(claimKey(flashSaleId, email));
-          const holdPttl = pttl; // from above
+          const holdPttl = await redis.pttl(holdKey(flashSaleId, email));
           return reply.code(409).send({
             message: 'Order is already being confirmed',
             claimTtlSec: claimPttl > 0 ? Math.ceil(claimPttl / 1000) : 0,
