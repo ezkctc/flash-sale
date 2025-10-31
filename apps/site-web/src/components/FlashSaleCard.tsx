@@ -96,22 +96,15 @@ export function FlashSaleCard({
     : 0;
 
   // Determine if user should see buy button or is already in queue
-  const isInQueue = queueStatus && queueStatus.size > 0;
-  const canPurchase =
-    queueStatus &&
-    queueStatus.position &&
-    meta.progress &&
-    queueStatus.position <= meta.progress.remaining;
+  const isInQueue = queueStatus && (queueStatus.position !== null || queueStatus.hasActiveHold);
 
   // Allow buying if:
-  // 1. Sale is ongoing, OR
-  // 2. Sale is upcoming but countdown completed (immediate activation)
-  // 3. Not sold out and user not in queue
-  const canBuyNow = 
-    ((meta.status === 'ongoing') || 
-     (meta.status === 'upcoming' && countdownCompleted)) && 
-    !meta.soldOut && 
-    !isInQueue;
+  // 1. Sale is active (ongoing OR upcoming with countdown completed)
+  // 2. Not sold out
+  // 3. User not in queue at all (position is null AND no active hold)
+  const saleIsActive = (meta.status === 'ongoing') || (meta.status === 'upcoming' && countdownCompleted);
+  const userNotInQueue = !queueStatus || (queueStatus.position === null && !queueStatus.hasActiveHold);
+  const canBuyNow = saleIsActive && !meta.soldOut && userNotInQueue;
 
   return (
     <Card
@@ -183,14 +176,23 @@ export function FlashSaleCard({
           >
             {buying ? 'Adding to Queue...' : 'Buy Now'}
           </Button>
-        ) : isInQueue ? (
+        ) : queueStatus && queueStatus.hasActiveHold ? (
+          <Button
+            size="large"
+            type="primary"
+            style={{ height: 50, fontSize: 16, borderRadius: 8 }}
+            block
+          >
+            Ready to Pay - Check Below
+          </Button>
+        ) : queueStatus && queueStatus.position !== null ? (
           <Button
             size="large"
             disabled
             style={{ height: 50, fontSize: 16, borderRadius: 8 }}
             block
           >
-            {canPurchase ? 'In Queue - Ready to Pay' : 'In Queue - Waiting'}
+            In Queue - Waiting
           </Button>
         ) : meta.soldOut ? (
           <Button
