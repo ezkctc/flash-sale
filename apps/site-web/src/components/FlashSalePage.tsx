@@ -61,6 +61,15 @@ export function FlashSalePage() {
   const checkQueueStatus = async () => {
     if (!userEmail || !flashSale?.item?._id) return;
 
+    // Don't check queue if sale is sold out
+    const isSoldOut = flashSale.meta.soldOut || 
+      (flashSale.meta.progress && flashSale.meta.progress.remaining <= 0);
+    
+    if (isSoldOut) {
+      setQueueStatus(null);
+      return;
+    }
+
     // Check if user has already purchased this flash sale
     try {
       const ordersResponse = await orderService.getOrdersByEmail(userEmail, 1, 10);

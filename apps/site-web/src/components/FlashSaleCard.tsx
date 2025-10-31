@@ -152,17 +152,17 @@ export function FlashSaleCard({
     ? meta.progress.starting - meta.progress.remaining
     : 0;
 
-  // Determine if user should see buy button or is already in queue
-  const isInQueue = queueStatus && (queueStatus.position !== null || queueStatus.hasActiveHold);
-
-  // Allow buying if:
-  // 1. Sale is active (ongoing OR upcoming with countdown completed)
-  // 2. Not sold out
-  // 3. User not in queue at all (position is null AND no active hold)
-  // 4. User hasn't already purchased this item
+  // Check if sale is truly sold out (no inventory remaining)
+  const isSoldOut = meta.soldOut || (meta.progress && meta.progress.remaining <= 0);
+  
+  // Sale timing checks
   const saleIsActive = (meta.status === 'ongoing') || (meta.status === 'upcoming' && countdownCompleted);
+  
+  // User state checks
   const userNotInQueue = !queueStatus || (queueStatus.position === null && !queueStatus.hasActiveHold);
-  const canBuyNow = saleIsActive && !meta.soldOut && userNotInQueue && !hasPurchased;
+  
+  // Final buy permission
+  const canBuyNow = saleIsActive && !isSoldOut && userNotInQueue && !hasPurchased;
 
   return (
     <Card
@@ -255,10 +255,11 @@ export function FlashSaleCard({
           <Button
             size="large"
             type="primary"
+            disabled={isSoldOut}
             style={{ height: 50, fontSize: 16, borderRadius: 8 }}
             block
           >
-            Ready to Pay - Check Below
+            {isSoldOut ? 'Sold Out' : 'Ready to Pay - Check Below'}
           </Button>
         ) : queueStatus && queueStatus.position !== null ? (
           <Button
@@ -267,9 +268,9 @@ export function FlashSaleCard({
             style={{ height: 50, fontSize: 16, borderRadius: 8 }}
             block
           >
-            In Queue - Waiting
+            {isSoldOut ? 'Sold Out' : 'In Queue - Waiting'}
           </Button>
-        ) : meta.soldOut ? (
+        ) : isSoldOut ? (
           <Button
             size="large"
             disabled

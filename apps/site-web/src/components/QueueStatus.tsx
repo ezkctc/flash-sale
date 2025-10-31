@@ -36,6 +36,10 @@ export function QueueStatus({
   const [confirming, setConfirming] = useState(false);
   const [liveHoldCountdown, setLiveHoldCountdown] = useState(0);
 
+  // Check if flash sale is sold out
+  const isSoldOut = flashSale.meta.soldOut || 
+    (flashSale.meta.progress && flashSale.meta.progress.remaining <= 0);
+
   const fetchPosition = useCallback(async () => {
     setLoading(true);
     try {
@@ -117,8 +121,13 @@ export function QueueStatus({
     );
   }
 
-  // Only show queue status if user is actually in queue or has hold
-  if (!position || (position.position === null && !position.hasActiveHold)) {
+  // Hide queue status if:
+  // 1. No position data
+  // 2. User not in queue and no hold
+  // 3. Sale is sold out (most important - no point showing queue for sold out items)
+  if (!position || 
+      (position.position === null && !position.hasActiveHold) || 
+      isSoldOut) {
     return null;
   }
 
@@ -177,6 +186,7 @@ export function QueueStatus({
                   size="large"
                   onClick={handleConfirmPayment}
                   loading={confirming}
+                  disabled={isSoldOut}
                   style={{
                     backgroundColor: 'rgba(255,255,255,0.2)',
                     borderColor: 'rgba(255,255,255,0.3)',
@@ -184,7 +194,9 @@ export function QueueStatus({
                     fontSize: 16,
                   }}
                 >
-                  {confirming
+                  {isSoldOut 
+                    ? 'Sold Out' 
+                    : confirming
                     ? 'Processing Payment...'
                     : 'Confirm Payment ($1.00)'}
                 </Button>
