@@ -19,6 +19,7 @@ interface QueueStatusProps {
   flashSaleId: string;
   flashSale: FlashSaleResponse;
   initialPosition: QueuePosition;
+  onPurchaseComplete?: (orderId: string) => void;
 }
 
 export function QueueStatus({
@@ -26,6 +27,7 @@ export function QueueStatus({
   flashSaleId,
   flashSale,
   initialPosition,
+  onPurchaseComplete,
 }: QueueStatusProps) {
   const [position, setPosition] = useState<QueuePosition | null>(
     initialPosition
@@ -83,6 +85,7 @@ export function QueueStatus({
 
       toast.success(`Payment confirmed! Order ID: ${result.orderId}`);
       fetchPosition(); // Refresh status
+      onPurchaseComplete?.(result.orderId);
       location.reload();
     } catch (error: any) {
       if (error.message.includes('expired')) {

@@ -26,6 +26,8 @@ export function FlashSalePage() {
   const [loading, setLoading] = useState(false);
   const [queueStatus, setQueueStatus] = useState<QueuePosition | null>(null); // Check for saved email on mount
   const [countdownCompleted, setCountdownCompleted] = useState(false);
+  const [hasPurchased, setHasPurchased] = useState(false);
+  const [userOrders, setUserOrders] = useState<any[]>([]);
 
   // Force re-render when countdown completes
   const [forceUpdate, setForceUpdate] = useState(0);
@@ -58,6 +60,23 @@ export function FlashSalePage() {
 
   const checkQueueStatus = async () => {
     if (!userEmail || !flashSale?.item?._id) return;
+
+    // Check if user has already purchased this flash sale
+    try {
+      const ordersResponse = await orderService.getOrdersByEmail(userEmail, 1, 10);
+      setUserOrders(ordersResponse.items);
+      
+      const hasPurchasedThisSale = ordersResponse.items.some(
+        order => order.flashSaleId === flashSale.item._id && order.paymentStatus === 'paid'
+      );
+      setHasPurchased(hasPurchasedThisSale);
+      
+      if (hasPurchasedThisSale) {
+        return; // Don't check queue if already purchased
+      }
+    } catch (error) {
+      // Continue with queue check if orders check fails
+    }
 
     try {
       const position = await queueService.getPosition(
@@ -99,6 +118,11 @@ export function FlashSalePage() {
 
   const handleBuyClick = (position: QueuePosition) => {
     setQueueStatus(position);
+  };
+
+  const handlePurchaseComplete = (orderId: string) => {
+    setHasPurchased(true);
+    setQueueStatus(null);
   };
 
   const handleCountdownComplete = () => {
@@ -195,7 +219,9 @@ export function FlashSalePage() {
                   meta={flashSale.meta}
                   userEmail={userEmail}
                   queueStatus={queueStatus}
+                  hasPurchased={hasPurchased}
                   onBuy={handleBuyClick}
+                  onPurchaseDetected={setHasPurchased}
                   countdownCompleted={countdownCompleted}
                   key={`${flashSale.item?._id}-${countdownCompleted}-${forceUpdate}`}
                 />
@@ -206,6 +232,7 @@ export function FlashSalePage() {
                     flashSaleId={flashSale.item._id}
                     flashSale={flashSale}
                     initialPosition={queueStatus}
+                    onPurchaseComplete={handlePurchaseComplete}
                   />
                 )}
               </>

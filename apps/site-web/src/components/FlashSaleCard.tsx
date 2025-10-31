@@ -1,6 +1,4 @@
-'use client';
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, Button, Progress, Typography, Space, Tag, Spin } from 'antd';
 import {
   ShoppingCartOutlined,
@@ -11,15 +9,67 @@ import { toast } from 'react-toastify';
 
 import type { FlashSaleItem, FlashSaleMeta } from '@/types';
 import { queueService } from '@/services';
+import { timeUtil, type TimeLeft } from '@/utils';
 
 const { Title, Text } = Typography;
+
+interface SaleEndCountdownProps {
+  targetDate: string;
+}
+
+function SaleEndCountdown({ targetDate }: SaleEndCountdownProps) {
+  const [timeLeft, setTimeLeft] = useState<TimeLeft>({
+    days: 0,
+    hours: 0,
+    minutes: 0,
+    seconds: 0,
+  });
+
+  useEffect(() => {
+    const calculateTimeLeft = () => {
+      const newTimeLeft = timeUtil.calculateTimeLeft(targetDate);
+      setTimeLeft(newTimeLeft);
+    };
+
+    calculateTimeLeft();
+    const timer = setInterval(calculateTimeLeft, 1000);
+
+    return () => clearInterval(timer);
+  }, [targetDate]);
+
+  const formatTime = () => {
+    if (timeLeft.days > 0) {
+      return `${timeLeft.days}d ${timeLeft.hours}h ${timeLeft.minutes}m`;
+    } else if (timeLeft.hours > 0) {
+      return `${timeLeft.hours}h ${timeLeft.minutes}m ${timeLeft.seconds}s`;
+    } else {
+      return `${timeLeft.minutes}m ${timeLeft.seconds}s`;
+    }
+  };
+
+  const isExpiringSoon = timeLeft.days === 0 && timeLeft.hours === 0 && timeLeft.minutes < 10;
+
+  return (
+    <Text 
+      style={{ 
+        fontSize: 14, 
+        fontWeight: 'bold',
+        color: isExpiringSoon ? '#ff4d4f' : '#fa8c16'
+      }}
+    >
+      🔥 Sale ends in: {formatTime()}
+    </Text>
+  );
+}
 
 interface FlashSaleCardProps {
   item: FlashSaleItem | null;
   meta: FlashSaleMeta;
   userEmail: string;
   queueStatus: any | null;
+  hasPurchased: boolean;
   onBuy: (position: any) => void;
+  onPurchaseDetected: (hasPurchased: boolean) => void;
   countdownCompleted?: boolean;
 }
 
@@ -28,7 +78,9 @@ export function FlashSaleCard({
   meta,
   userEmail,
   queueStatus,
+  hasPurchased,
   onBuy,
+  onPurchaseDetected,
   countdownCompleted = false,
 }: FlashSaleCardProps) {
   const [buying, setBuying] = useState(false);
@@ -66,6 +118,7 @@ export function FlashSaleCard({
     } catch (error: any) {
       if (error.status === 409 && error.message.includes('already purchased')) {
         toast.info('You have already purchased this item!');
+        onPurchaseDetected(true);
       } else {
         toast.error(error.message || 'Failed to place order');
       }
@@ -106,9 +159,10 @@ export function FlashSaleCard({
   // 1. Sale is active (ongoing OR upcoming with countdown completed)
   // 2. Not sold out
   // 3. User not in queue at all (position is null AND no active hold)
+  // 4. User hasn't already purchased this item
   const saleIsActive = (meta.status === 'ongoing') || (meta.status === 'upcoming' && countdownCompleted);
   const userNotInQueue = !queueStatus || (queueStatus.position === null && !queueStatus.hasActiveHold);
-  const canBuyNow = saleIsActive && !meta.soldOut && userNotInQueue;
+  const canBuyNow = saleIsActive && !meta.soldOut && userNotInQueue && !hasPurchased;
 
   return (
     <Card
@@ -162,7 +216,24 @@ export function FlashSaleCard({
       )}
 
       <div style={{ textAlign: 'center' }}>
-        {canBuyNow ? (
+        {hasPurchased ? (
+          <Button
+            size="large"
+            disabled
+            icon={<CheckCircleOutlined />}
+            style={{ 
+              height: 50, 
+              fontSize: 16, 
+              borderRadius: 8,
+              backgroundColor: '#f6ffed',
+              borderColor: '#b7eb8f',
+              color: '#52c41a'
+            }}
+            block
+          >
+            You have already purchased this item
+          </Button>
+        ) : canBuyNow ? (
           <Button
             type="primary"
             size="large"
@@ -239,9 +310,13 @@ export function FlashSaleCard({
 
       {((meta.status === 'ongoing') || (meta.status === 'upcoming' && countdownCompleted)) && (
         <div style={{ textAlign: 'center', marginTop: 16 }}>
-          <Text type="secondary" style={{ fontSize: 12 }}>
-            Sale ends: {new Date(meta.endsAt!).toLocaleString()}
-          </Text>
+          {meta.status === 'ongoing' ? (
+            <SaleEndCountdown targetDate={meta.endsAt!} />
+          ) : (
+            <Text type="secondary" style={{ fontSize: 12 }}>
+              Sale ends: {new Date(meta.endsAt!).toLocaleString()}
+            </Text>
+          )}
         </div>
       )}
     </Card>
