@@ -1,12 +1,11 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import IORedis from 'ioredis';
 import { Queue } from 'bullmq';
+import { zsetKey, holdKey } from '@flash-sale/shared-utils';
 
 const HOLD_TTL_SECONDS = Number(process.env.HOLD_TTL_SECONDS ?? 900);
 const REDIS_URL = process.env.REDIS_URL ?? 'redis://:redispass@localhost:6379';
-const zsetKey = (flashSaleId: string) => `fsq:${flashSaleId}`;
-const holdKey = (flashSaleId: string, email: string) =>
-  `fsh:${flashSaleId}:${email}`;
+const QUEUE_NAME = process.env.QUEUE_NAME ?? 'sale-processing-queue';
 
 type Query = {
   email: string;
@@ -15,9 +14,7 @@ type Query = {
 
 export default async function (app: FastifyInstance) {
   const redis = new IORedis(REDIS_URL);
-  const queue = new Queue(process.env.QUEUE_NAME ?? 'sale-processing-queue', {
-    connection: { url: REDIS_URL },
-  });
+  const queue = new Queue(QUEUE_NAME, { connection: { url: REDIS_URL } });
 
   app.get<{ Querystring: Query }>(
     '/position',
@@ -40,10 +37,18 @@ export default async function (app: FastifyInstance) {
             additionalProperties: false,
             properties: {
               status: { type: 'string', enum: ['queued', 'ready', 'none'] },
-              position: { type: 'number', nullable: true }, // when queued
+              position: { type: 'number', nullable: true },
               size: { type: 'number' },
               hasActiveHold: { type: 'boolean' },
               holdTtlSec: { type: 'number' },
+              // debug fields
+              pttlRaw: { type: 'integer' }, // -2, -1, or >=0 (ms)
+              zsetKey: { type: 'string' },
+              queueName: { type: 'string' },
+              redisUrl: { type: 'string' },
+              email: { type: 'string' },
+              flashSaleId: { type: 'string' },
+              ts: { type: 'number' },
             },
             required: [
               'status',
@@ -51,6 +56,13 @@ export default async function (app: FastifyInstance) {
               'size',
               'hasActiveHold',
               'holdTtlSec',
+              'pttlRaw',
+              'zsetKey',
+              'queueName',
+              'redisUrl',
+              'email',
+              'flashSaleId',
+              'ts',
             ],
           },
         },
@@ -63,10 +75,11 @@ export default async function (app: FastifyInstance) {
       try {
         const email = request.query.email.trim().toLowerCase();
         const flashSaleId = request.query.flashSaleId;
+        const key = zsetKey(flashSaleId);
 
         const [rank, size, pttl] = await Promise.all([
-          redis.zrank(zsetKey(flashSaleId), email),
-          redis.zcard(zsetKey(flashSaleId)),
+          redis.zrank(key, email),
+          redis.zcard(key),
           redis.pttl(holdKey(flashSaleId, email)), // -2 no key, -1 no expire, >=0 ms
         ]);
 
@@ -81,18 +94,28 @@ export default async function (app: FastifyInstance) {
           holdTtlSec = HOLD_TTL_SECONDS;
         }
 
-        // If user has a hold, they’re "ready" even if not in ZSET (worker removes them)
+        const base = {
+          // debug/meta
+          pttlRaw: pttl,
+          zsetKey: key,
+          queueName: QUEUE_NAME,
+          redisUrl: REDIS_URL,
+          email,
+          flashSaleId,
+          ts: Date.now(),
+        };
+
         if (hasActiveHold) {
           return reply.code(200).send({
             status: 'ready',
-            position: 1, // UX: at the front / ready to checkout
-            size, // others still in queue
+            position: 1,
+            size,
             hasActiveHold,
             holdTtlSec,
+            ...base,
           });
         }
 
-        // Not holding: they might still be queued, or not present at all
         if (rank !== null) {
           return reply.code(200).send({
             status: 'queued',
@@ -100,16 +123,17 @@ export default async function (app: FastifyInstance) {
             size,
             hasActiveHold: false,
             holdTtlSec: 0,
+            ...base,
           });
         }
 
-        // Neither in queue nor holding
         return reply.code(200).send({
           status: 'none',
           position: null,
           size,
           hasActiveHold: false,
           holdTtlSec: 0,
+          ...base,
         });
       } catch (err) {
         request.log.error(err);

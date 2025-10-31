@@ -1,11 +1,9 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { authGuard } from '../auth/auth-guard';
 import IORedis from 'ioredis';
+import { zsetKey, holdKey } from '@flash-sale/shared-utils';
 
 const REDIS_URL = process.env.REDIS_URL ?? 'redis://:redispass@localhost:6379';
-const zsetKey = (flashSaleId: string) => `fsq:${flashSaleId}`;
-const holdKey = (flashSaleId: string, email: string) =>
-  `fsh:${flashSaleId}:${email}`;
 
 type Query = { flashSaleId: string; page?: number; limit?: number };
 

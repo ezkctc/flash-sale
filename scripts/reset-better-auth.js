@@ -15,8 +15,8 @@ const { MongoClient } = require('mongodb');
     process.env.MONGO_DB ||
     (process.env.MONGODB_URL
       ? new URL(process.env.MONGODB_URL).pathname.replace(/^\//, '') ||
-        'flashsale'
-      : 'flashsale');
+        'flash_sale_db'
+      : 'flash_sale_db');
 
   const client = new MongoClient(mongoUrl);
   try {

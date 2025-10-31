@@ -14,16 +14,16 @@ const QUEUE_NAME = process.env.QUEUE_NAME || 'sale-processing-queue';
 
 async function resetRedis() {
   const redis = new IORedis(REDIS_URL);
-  
+
   try {
     console.log('🔄 Connecting to Redis...');
-    
+
     // Test connection
     await redis.ping();
     console.log('✅ Connected to Redis');
-    
+
     let totalDeleted = 0;
-    
+
     // 1. Clear BullMQ queue data
     console.log('\n📋 Clearing BullMQ queue data...');
     const queuePatterns = [
@@ -39,7 +39,7 @@ async function resetRedis() {
       `bull:${QUEUE_NAME}:paused`,
       `bull:${QUEUE_NAME}:meta`,
     ];
-    
+
     for (const pattern of queuePatterns) {
       const keys = await redis.keys(pattern);
       if (keys.length > 0) {
@@ -48,7 +48,7 @@ async function resetRedis() {
         console.log(`  - Deleted ${deleted} keys matching: ${pattern}`);
       }
     }
-    
+
     // 2. Clear flash sale queue positions (fsq:*)
     console.log('\n🎯 Clearing flash sale queues...');
     const queueKeys = await redis.keys('fsq:*');
@@ -57,7 +57,7 @@ async function resetRedis() {
       totalDeleted += deleted;
       console.log(`  - Deleted ${deleted} flash sale queue keys`);
     }
-    
+
     // 3. Clear hold keys (fsh:*)
     console.log('\n🔒 Clearing hold keys...');
     const holdKeys = await redis.keys('fsh:*');
@@ -66,7 +66,7 @@ async function resetRedis() {
       totalDeleted += deleted;
       console.log(`  - Deleted ${deleted} hold keys`);
     }
-    
+
     // 4. Clear sale metadata cache (fsmeta:*)
     console.log('\n📊 Clearing sale metadata cache...');
     const metaKeys = await redis.keys('fsmeta:*');
@@ -75,15 +75,11 @@ async function resetRedis() {
       totalDeleted += deleted;
       console.log(`  - Deleted ${deleted} metadata cache keys`);
     }
-    
+
     // 5. Clear any other flash sale related keys
     console.log('\n🧹 Clearing other flash sale keys...');
-    const otherPatterns = [
-      'fs:*',
-      'flashsale:*',
-      'sale:*',
-    ];
-    
+    const otherPatterns = ['fs:*', 'flashsale:*', 'sale:*', 'flash_sale_db:*'];
+
     for (const pattern of otherPatterns) {
       const keys = await redis.keys(pattern);
       if (keys.length > 0) {
@@ -92,14 +88,15 @@ async function resetRedis() {
         console.log(`  - Deleted ${deleted} keys matching: ${pattern}`);
       }
     }
-    
+
     console.log(`\n✅ Redis reset complete!`);
     console.log(`📊 Total keys deleted: ${totalDeleted}`);
-    
+
     if (totalDeleted === 0) {
-      console.log('ℹ️  No flash sale related keys found - Redis was already clean');
+      console.log(
+        'ℹ️  No flash sale related keys found - Redis was already clean'
+      );
     }
-    
   } catch (error) {
     console.error('❌ Error resetting Redis:', error.message);
     process.exit(1);

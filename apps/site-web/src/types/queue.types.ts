@@ -1,5 +1,3 @@
-import type { QueuePosition } from './queue.types';
-
 export interface QueuePosition {
   position: number | null;
   size: number;

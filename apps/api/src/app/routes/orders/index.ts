@@ -5,6 +5,7 @@ import adminListRoute from './admin-list';
 import adminQueueMembersRoute from './admin-queue-members';
 import adminQueueOverviewRoute from './admin-queue-overview';
 import adminQueueStreamRoute from './admin-queue-stream';
+import adminQueueAuditRoute from './admin-queue-audit';
 import buyRoute from './buy';
 import byEmailRoute from './by-email';
 import confirmRoute from './confirm';
@@ -22,6 +23,7 @@ export const ordersRoutes = async (app: FastifyInstance) => {
   adminQueueMembersRoute(app);
   adminQueueOverviewRoute(app);
   adminQueueStreamRoute(app);
+  adminQueueAuditRoute(app);
 };
 
 export default ordersRoutes;

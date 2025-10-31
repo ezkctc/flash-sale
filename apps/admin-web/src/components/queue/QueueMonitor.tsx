@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Card, Table, Tag, Space, Button, Select, Statistic, Row, Col } from 'antd';
+import { Card, Table, Tag, Space, Button, Select, Statistic, Row, Col, Divider } from 'antd';
 import { ReloadOutlined, EyeOutlined } from '@ant-design/icons';
 import { toast } from 'react-toastify';
 import { apiFetch } from '@/lib/services/api';
@@ -38,6 +38,16 @@ export function QueueMonitor() {
   const [members, setMembers] = useState<QueueMember[]>([]);
   const [loading, setLoading] = useState(false);
   const [membersLoading, setMembersLoading] = useState(false);
+  const [auditLoading, setAuditLoading] = useState(false);
+  const [audit, setAudit] = useState<{
+    ts: number;
+    queueName: string;
+    flashSaleId: string;
+    head: QueueMember[];
+    holds: Array<{ key: string; email: string; ttlSec: number; inQueue: boolean }>;
+    otherQueues: Array<{ saleId: string; size: number }>;
+    strays: QueueMember[];
+  } | null>(null);
   const [pagination, setPagination] = useState({
     current: 1,
     pageSize: 50,
@@ -147,6 +157,20 @@ export function QueueMonitor() {
     },
   ];
 
+  // Audit loader
+  const loadAudit = async () => {
+    if (!selectedSaleId) return;
+    setAuditLoading(true);
+    try {
+      const res = await apiFetch(`/orders/admin/queue/audit?flashSaleId=${selectedSaleId}&sample=100`);
+      setAudit(res as any);
+    } catch (e: any) {
+      toast.error('Failed to load audit');
+    } finally {
+      setAuditLoading(false);
+    }
+  };
+
   const handleTableChange = (paginationInfo: any) => {
     loadMembers(paginationInfo.current, paginationInfo.pageSize);
   };
@@ -249,6 +273,87 @@ export function QueueMonitor() {
           }}
           onChange={handleTableChange}
           scroll={{ x: 600 }}
+        />
+      </Card>
+
+      <Card
+        title="Audit Snapshot"
+        extra={
+          <Space>
+            <Button icon={<ReloadOutlined />} onClick={loadAudit} loading={auditLoading}>
+              Refresh Audit
+            </Button>
+          </Space>
+        }
+      >
+        <div className="mb-4">
+          <Space size={24}>
+            <div>
+              <strong>Queue:</strong> {audit?.queueName || '—'}
+            </div>
+            <div>
+              <strong>Flash Sale:</strong> {audit?.flashSaleId || selectedSaleId || '—'}
+            </div>
+            <div>
+              <strong>Captured:</strong> {audit?.ts ? new Date(audit.ts).toLocaleString() : '—'}
+            </div>
+          </Space>
+        </div>
+
+        <Divider orientation="left">Head Preview (with Hold TTL)</Divider>
+        <Table
+          rowKey={(r) => `${r.email}:${r.position}`}
+          columns={columns}
+          dataSource={audit?.head || []}
+          size="small"
+          pagination={false}
+        />
+
+        <Divider orientation="left">Active Holds</Divider>
+        <Table
+          rowKey={(r) => r.key}
+          columns={[
+            { title: 'Email', dataIndex: 'email', key: 'email', width: 240 },
+            {
+              title: 'TTL',
+              dataIndex: 'ttlSec',
+              key: 'ttlSec',
+              width: 140,
+              render: (ttl: number) => (ttl > 0 ? <Tag color="green">{ttl}s</Tag> : <Tag>No TTL</Tag>),
+            },
+            {
+              title: 'In Queue',
+              dataIndex: 'inQueue',
+              key: 'inQueue',
+              width: 120,
+              render: (b: boolean) => (b ? <Tag color="orange">Yes</Tag> : <Tag color="blue">No</Tag>),
+            },
+            { title: 'Key', dataIndex: 'key', key: 'key' },
+          ]}
+          dataSource={audit?.holds || []}
+          size="small"
+          pagination={false}
+        />
+
+        <Divider orientation="left">Other Queues</Divider>
+        <Table
+          rowKey={(r) => r.saleId}
+          columns={[
+            { title: 'Sale Id', dataIndex: 'saleId', key: 'saleId' },
+            { title: 'Size', dataIndex: 'size', key: 'size', width: 120 },
+          ]}
+          dataSource={audit?.otherQueues || []}
+          size="small"
+          pagination={false}
+        />
+
+        <Divider orientation="left">Strays (In Queue while Holding)</Divider>
+        <Table
+          rowKey={(r) => `${r.email}:${r.position}`}
+          columns={columns}
+          dataSource={audit?.strays || []}
+          size="small"
+          pagination={false}
         />
       </Card>
     </div>

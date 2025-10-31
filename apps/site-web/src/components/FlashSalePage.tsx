@@ -24,9 +24,8 @@ export function FlashSalePage() {
   const [showEmailPrompt, setShowEmailPrompt] = useState(false);
   const [flashSale, setFlashSale] = useState<FlashSaleResponse | null>(null);
   const [loading, setLoading] = useState(false);
-  const [queueStatus, setQueueStatus] = useState<QueuePosition | null>(null);
+  const [queueStatus, setQueueStatus] = useState<QueuePosition | null>(null); // Check for saved email on mount
 
-  // Check for saved email on mount
   useEffect(() => {
     const savedEmail = storageUtil.getUserEmail();
     if (savedEmail) {
@@ -34,9 +33,8 @@ export function FlashSalePage() {
     } else {
       setShowEmailPrompt(true);
     }
-  }, []);
+  }, []); // Fetch flash sale data
 
-  // Fetch flash sale data
   const fetchFlashSale = async () => {
     setLoading(true);
     try {
@@ -47,19 +45,8 @@ export function FlashSalePage() {
     } finally {
       setLoading(false);
     }
-  };
+  }; // Check queue status periodically
 
-  // Fetch flash sale on email set and periodically
-  useEffect(() => {
-    if (userEmail) {
-      fetchFlashSale();
-      checkQueueStatus();
-      const interval = setInterval(fetchFlashSale, 30000); // Refresh every 30 seconds
-      return () => clearInterval(interval);
-    }
-  }, [userEmail]);
-
-  // Check if user is already in queue
   const checkQueueStatus = async () => {
     if (!userEmail || !flashSale?.item?._id) return;
 
@@ -75,9 +62,19 @@ export function FlashSalePage() {
       // User not in queue, which is fine
       setQueueStatus(null);
     }
-  };
+  }; // Fetch flash sale on email set and periodically
 
-  // Check queue status when flash sale data changes
+  /// TODO: implement notifs to replace this
+  useEffect(() => {
+    if (userEmail) {
+      fetchFlashSale();
+      checkQueueStatus();
+      const interval = setInterval(fetchFlashSale, 30000); // Refresh every 30 seconds // Return the cleanup function when userEmail is present
+      return () => clearInterval(interval);
+    } // Explicitly return void/undefined for the false path to satisfy strict TypeScript
+    return;
+  }, [userEmail]); // Check queue status when flash sale data changes
+
   useEffect(() => {
     if (userEmail && flashSale?.item?._id) {
       checkQueueStatus();
@@ -116,7 +113,6 @@ export function FlashSalePage() {
         <Title level={2} style={{ color: 'white', margin: 0 }}>
           ⚡ Flash Sale
         </Title>
-
         <Space>
           {userEmail && (
             <Text style={{ color: 'rgba(255,255,255,0.9)' }}>{userEmail}</Text>
@@ -147,7 +143,6 @@ export function FlashSalePage() {
           )}
         </Space>
       </Header>
-
       <Content
         style={{
           padding: '24px',
@@ -157,7 +152,6 @@ export function FlashSalePage() {
         }}
       >
         <EmailPrompt open={showEmailPrompt} onSubmit={handleEmailSubmit} />
-
         {userEmail && (
           <Space direction="vertical" size="large" style={{ width: '100%' }}>
             {loading && !flashSale ? (
@@ -177,7 +171,6 @@ export function FlashSalePage() {
                       title="Sale Starts In"
                     />
                   )}
-
                 {/* Show flash sale card */}
                 <FlashSaleCard
                   item={flashSale.item}
@@ -186,7 +179,6 @@ export function FlashSalePage() {
                   queueStatus={queueStatus}
                   onBuy={handleBuyClick}
                 />
-
                 {/* Show queue status if user is in queue */}
                 {queueStatus && queueStatus.size > 0 && flashSale.item && (
                   <QueueStatus
@@ -205,7 +197,6 @@ export function FlashSalePage() {
                 </Text>
               </Card>
             )}
-
             {/* User Orders Section */}
             <UserOrders userEmail={userEmail} />
           </Space>
