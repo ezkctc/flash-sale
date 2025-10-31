@@ -17,7 +17,7 @@
             "cjs"
           ],
           "bundle": false,
-          "main": "apps/worker/src/main.ts",
+          "main": "apps/worker/src/boot.ts",
           "tsConfig": "apps/worker/tsconfig.app.json",
           "assets": [
             "apps/worker/src/assets"

@@ -24,7 +24,7 @@ describe('Flash Sales - Update Route', () => {
   beforeEach(async () => {
     vi.clearAllMocks();
     app = Fastify();
-    // FIX: Using 'as any' on the decorated object to bypass strict Db typing for the test mock.
+
     app.decorate('mongo', { db: {} } as any);
     await app.register(updateRoute);
     await app.ready();

@@ -1,24 +1,37 @@
-# ---------- 1. Builder ----------
-FROM node:20-alpine AS builder
+# ---------- 1) Base deps/cache ----------
+FROM node:20-alpine AS deps
 WORKDIR /app
 
-# Copy all repo files
-COPY . .
-
+# Install root deps first to leverage layer cache
+COPY package*.json ./
 RUN npm ci
 
-# Build the worker (if it’s an Nx target)
+# Bring in the rest of the repo (sources, nx.json, tsconfig, etc.)
+COPY . .
+
+# ---------- 2) Build + prune (Nx) ----------
+FROM deps AS build
+# Build just the worker app
 RUN npx nx build @flash-sale/worker
 
-# ---------- 2. Runtime ----------
+# Create a minimal dependency set for runtime (only what's needed by the worker)
+# This generates /app/pruned/{package.json, package-lock.json}
+RUN npx nx prune --project=@flash-sale/worker
+
+# ---------- 3) Runtime ----------
 FROM node:20-alpine AS runner
 WORKDIR /app
-
 ENV NODE_ENV=production
 
-# Copy built worker code
-COPY --from=builder /app/dist/apps/worker ./dist
-COPY package*.json ./
+# Install only pruned, production dependencies
+COPY --from=build /app/pruned/package*.json ./
+RUN npm ci --omit=dev
 
-# Run the BullMQ worker
-CMD ["node", "dist/apps/worker/main.js"]
+# Copy the built worker dist
+COPY --from=build /app/dist/apps/worker ./dist/apps/worker
+
+# Run as non-root for safety
+USER node
+
+# IMPORTANT: use boot.js (not main.js) so tests don’t trigger worker on import
+CMD ["node", "dist/apps/worker/boot.js"]

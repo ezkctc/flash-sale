@@ -30,7 +30,7 @@ describe('Flash Sales - List Route', () => {
   beforeEach(async () => {
     vi.clearAllMocks();
     app = Fastify();
-    // FIX: Using 'as any' on the decorated object to bypass strict Db typing for the test mock.
+
     app.decorate('mongo', { db: {} } as any);
     await app.register(listRoute);
     await app.ready();
@@ -50,7 +50,7 @@ describe('Flash Sales - List Route', () => {
         endsAt: new Date(),
       },
     ];
-    // Cast to 'any' for mocking chained functions, as TypeScript doesn't track mockReturnThis well
+
     (flashSaleMongoModel.find as any)().lean.mockResolvedValue(mockSales);
     (flashSaleMongoModel.countDocuments as any).mockResolvedValue(1);
 
