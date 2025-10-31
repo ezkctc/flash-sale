@@ -64,7 +64,11 @@ export function FlashSaleCard({
 
       onBuy(result);
     } catch (error: any) {
-      toast.error(error.message || 'Failed to place order');
+      if (error.status === 409 && error.message.includes('already purchased')) {
+        toast.info('You have already purchased this item!');
+      } else {
+        toast.error(error.message || 'Failed to place order');
+      }
     } finally {
       setBuying(false);
     }

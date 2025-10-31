@@ -2,6 +2,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { Queue } from 'bullmq';
 import IORedis from 'ioredis';
 import { zsetKey, holdKey } from '@flash-sale/shared-utils';
+import { orderMongoModel } from '@flash-sale/shared-types';
 
 const QUEUE_NAME = process.env.QUEUE_NAME ?? 'sale-processing-queue';
 const REDIS_URL = process.env.REDIS_URL ?? 'redis://:redispass@localhost:6379';
@@ -64,6 +65,14 @@ export default async function (app: FastifyInstance) {
               'zsetKey',
             ],
           },
+          409: {
+            type: 'object',
+            properties: {
+              message: { type: 'string' },
+              orderId: { type: 'string' },
+            },
+            required: ['message'],
+          },
         },
       },
     },
@@ -79,6 +88,29 @@ export default async function (app: FastifyInstance) {
       const nowMs = Date.now();
       const qKey = zsetKey(flashSaleId);
 
+      // 🛡️ GUARD: Check if user already has a confirmed order for this flash sale
+      try {
+        const existingOrder = await orderMongoModel
+          .findOne(
+            { 
+              userEmail: email, 
+              flashSaleId: flashSaleId,
+              paymentStatus: 'paid' 
+            },
+            { _id: 1 }
+          )
+          .lean();
+
+        if (existingOrder) {
+          return reply.code(409).send({
+            message: 'You have already purchased this item',
+            orderId: String(existingOrder._id),
+          });
+        }
+      } catch (dbError) {
+        request.log.error({ dbError, email, flashSaleId }, 'Failed to check existing order');
+        // Continue with the flow - don't block on DB errors
+      }
       // 1️⃣ Check if user already has an active hold
       const pttl = await redis.pttl(holdKey(flashSaleId, email));
       let hasActiveHold = false;
