@@ -67,25 +67,7 @@ export function QueueStatus({ userEmail, flashSaleId, flashSale, initialPosition
     fetchPosition();
     const interval = setInterval(fetchPosition, 5000); // Poll every 5 seconds
     return () => clearInterval(interval);
-  }, [fetchPosition]);
-
-  // Hold countdown timer
-  useEffect(() => {
-    if (holdCountdown <= 0) return;
-
-    const timer = setInterval(() => {
-      setHoldCountdown(prev => {
-        if (prev <= 1) {
-          // Hold expired, refresh position
-          fetchPosition();
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, [holdCountdown, fetchPosition]);
+  }, [userEmail, flashSaleId]);
 
   if (loading && !position) {
     return (
@@ -102,9 +84,9 @@ export function QueueStatus({ userEmail, flashSaleId, flashSale, initialPosition
     return null;
   }
 
-  // Use live countdown if available, otherwise use position data
-  const currentHoldTime = holdCountdown > 0 ? holdCountdown : position.holdTtlSec;
-  const holdTimeFormatted = timeUtil.formatDuration(currentHoldTime);
+  const holdMinutes = Math.floor(position.holdTtlSec / 60);
+  const holdSeconds = position.holdTtlSec % 60;
+  const holdTimeFormatted = timeUtil.formatDuration(position.holdTtlSec);
 
   // Check if user can purchase based on position vs remaining inventory
   const canPurchase = position.position && 
@@ -134,22 +116,15 @@ export function QueueStatus({ userEmail, flashSaleId, flashSale, initialPosition
                 <Title level={3} style={{ color: 'white', margin: 0 }}>
                   Reservation Confirmed!
                 </Title>
-                {currentHoldTime > 0 ? (
-                  <Text style={{ color: 'rgba(255,255,255,0.9)', fontSize: 16 }}>
-                    You have {holdTimeFormatted} to complete your purchase
-                  </Text>
-                ) : (
-                  <Text style={{ color: 'rgba(255,255,255,0.9)', fontSize: 16 }}>
-                    Your reservation has expired
-                  </Text>
-                )}
+                <Text style={{ color: 'rgba(255,255,255,0.9)', fontSize: 16 }}>
+                  You have {holdTimeFormatted} to complete your purchase
+                </Text>
               </div>
               <Button
                 type="primary"
                 size="large"
                 onClick={handleConfirmPayment}
                 loading={confirming}
-                disabled={currentHoldTime <= 0}
                 style={{
                   backgroundColor: 'rgba(255,255,255,0.2)',
                   borderColor: 'rgba(255,255,255,0.3)',
@@ -157,12 +132,7 @@ export function QueueStatus({ userEmail, flashSaleId, flashSale, initialPosition
                   fontSize: 16,
                 }}
               >
-                {currentHoldTime <= 0 
-                  ? 'Reservation Expired' 
-                  : confirming 
-                    ? 'Processing Payment...' 
-                    : 'Confirm Payment ($1.00)'
-                }
+                {confirming ? 'Processing Payment...' : 'Confirm Payment ($1.00)'}
               </Button>
             </>
           ) : canPurchase ? (
@@ -196,11 +166,11 @@ export function QueueStatus({ userEmail, flashSaleId, flashSale, initialPosition
               <ClockCircleOutlined style={{ fontSize: 48 }} />
               <div>
                 <Title level={3} style={{ color: 'white', margin: 0 }}>
-                  {position.position ? 'Waiting in Queue' : 'Processing Request'}
+                  Waiting in Queue
                 </Title>
                 {position.position ? (
                   <Text style={{ color: 'rgba(255,255,255,0.9)', fontSize: 16 }}>
-                    Position #{position.position} of {position.size} - Waiting for your turn
+                    Position #{position.position} of {position.size} - Not enough inventory yet
                   </Text>
                 ) : (
                   <Text style={{ color: 'rgba(255,255,255,0.9)', fontSize: 16 }}>
