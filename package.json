@@ -16,7 +16,9 @@
     "dev": "cross-env NX_DAEMON=false npm run infra:ensure && concurrently \"nx serve @flash-sale/api\" \"nx serve @flash-sale/worker\" \"nx serve @flash-sale/admin-web\" \"nx serve @flash-sale/site-web\"",
     "seed": "tsx apps/api/src/seed.ts",
     "seed:admin": "tsx apps/api/src/seed-admin.ts",
-    "auth:reset": "node scripts/reset-better-auth.js"
+    "auth:reset": "node scripts/reset-better-auth.js",
+    "redis:reset": "node scripts/reset-redis.js",
+    "redis:reset-all": "node scripts/reset-redis-full.js"
   },
   "private": true,
   "devDependencies": {
