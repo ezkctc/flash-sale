@@ -9,8 +9,6 @@ import { OrderShape } from '../shapes/index.js';
 
 export const orderSchema = new Schema(
   {
-    _id: { type: Schema.Types.ObjectId },
-
     // Reference to the user (optional if email is stored directly)
     userEmail: { type: String, trim: true, required: true, index: true },
 

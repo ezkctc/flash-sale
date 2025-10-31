@@ -26,10 +26,15 @@ export function UserOrders({ userEmail }: UserOrdersProps) {
 
   const loadOrders = async (page = 1, pageSize = 10) => {
     if (!userEmail) return;
-    
+
     setLoading(true);
     try {
-      const response = await orderService.getOrdersByEmail(userEmail, page, pageSize);
+      const response = await orderService.getOrdersByEmail(
+        userEmail,
+        page,
+        pageSize
+      );
+
       setOrders(response.items);
       setPagination({
         current: response.page,
@@ -66,7 +71,7 @@ export function UserOrders({ userEmail }: UserOrdersProps) {
       width: 120,
       render: (id: string) => (
         <Text code style={{ fontSize: 12 }}>
-          {id.slice(-8)}
+          {id.toString().slice(-8)}
         </Text>
       ),
     },
@@ -76,9 +81,7 @@ export function UserOrders({ userEmail }: UserOrdersProps) {
       key: 'paymentStatus',
       width: 100,
       render: (status: string) => (
-        <Tag color={getStatusColor(status)}>
-          {status.toUpperCase()}
-        </Tag>
+        <Tag color={getStatusColor(status)}>{status.toUpperCase()}</Tag>
       ),
     },
     {
@@ -148,7 +151,10 @@ export function UserOrders({ userEmail }: UserOrdersProps) {
         </Empty>
       ) : (
         <Table
-          rowKey="_id"
+          rowKey={(record: Order) =>
+            record._id?.toString?.() ??
+            `${record.userEmail}-${record.createdAt}`
+          }
           columns={columns}
           dataSource={orders}
           loading={loading}

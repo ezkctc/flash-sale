@@ -37,12 +37,12 @@ export default async function (app: FastifyInstance) {
             additionalProperties: false,
             properties: {
               status: { type: 'string', enum: ['queued', 'ready', 'none'] },
-              position: { type: 'number', nullable: true },
+              position: { type: ['number', 'null'] },
               size: { type: 'number' },
               hasActiveHold: { type: 'boolean' },
               holdTtlSec: { type: 'number' },
-              // debug fields
-              pttlRaw: { type: 'integer' }, // -2, -1, or >=0 (ms)
+              // debug/meta fields
+              pttlRaw: { type: 'integer' },
               zsetKey: { type: 'string' },
               queueName: { type: 'string' },
               redisUrl: { type: 'string' },
@@ -77,25 +77,27 @@ export default async function (app: FastifyInstance) {
         const flashSaleId = request.query.flashSaleId;
         const key = zsetKey(flashSaleId);
 
+        // fetch queue & hold info
         const [rank, size, pttl] = await Promise.all([
           redis.zrank(key, email),
           redis.zcard(key),
           redis.pttl(holdKey(flashSaleId, email)), // -2 no key, -1 no expire, >=0 ms
         ]);
 
+        // determine hold state
         let hasActiveHold = false;
         let holdTtlSec = 0;
         if (pttl > 0) {
           hasActiveHold = true;
           holdTtlSec = Math.ceil(pttl / 1000);
         } else if (pttl === -1) {
-          // key exists with no expiry (shouldn’t happen if worker sets EX) – treat as active
+          // key exists with no expiry — treat as active fallback
           hasActiveHold = true;
           holdTtlSec = HOLD_TTL_SECONDS;
         }
 
+        // base debug/meta info
         const base = {
-          // debug/meta
           pttlRaw: pttl,
           zsetKey: key,
           queueName: QUEUE_NAME,
@@ -105,10 +107,13 @@ export default async function (app: FastifyInstance) {
           ts: Date.now(),
         };
 
+        // -------------------------------------------
+        //  ACTIVE HOLD: user already has slot
+        // -------------------------------------------
         if (hasActiveHold) {
           return reply.code(200).send({
             status: 'ready',
-            position: 1,
+            position: null, // ✅ not part of queue anymore
             size,
             hasActiveHold,
             holdTtlSec,
@@ -116,6 +121,9 @@ export default async function (app: FastifyInstance) {
           });
         }
 
+        // -------------------------------------------
+        //  STILL QUEUED: show rank + 1
+        // -------------------------------------------
         if (rank !== null) {
           return reply.code(200).send({
             status: 'queued',
@@ -127,6 +135,9 @@ export default async function (app: FastifyInstance) {
           });
         }
 
+        // -------------------------------------------
+        //  NOT IN QUEUE NOR HOLD
+        // -------------------------------------------
         return reply.code(200).send({
           status: 'none',
           position: null,
@@ -142,6 +153,7 @@ export default async function (app: FastifyInstance) {
     }
   );
 
+  // graceful cleanup
   app.addHook('onClose', async () => {
     await queue.close();
     await redis.quit();

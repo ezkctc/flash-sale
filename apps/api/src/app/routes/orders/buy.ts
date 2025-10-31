@@ -7,7 +7,7 @@ const QUEUE_NAME = process.env.QUEUE_NAME ?? 'sale-processing-queue';
 const REDIS_URL = process.env.REDIS_URL ?? 'redis://:redispass@localhost:6379';
 const QUEUE_PREFIX = process.env.BULLMQ_PREFIX ?? 'flashsale';
 
-const HOLD_TTL_SECONDS = Number(process.env.HOLD_TTL_SECONDS ?? 900); // 15 min
+const HOLD_TTL_SECONDS = Number(process.env.HOLD_TTL_SECONDS ?? 900); // 15 minutes
 
 type BuyBody = { email: string; flashSaleId: string };
 
@@ -23,11 +23,11 @@ export default async function (app: FastifyInstance) {
     {
       schema: {
         tags: ['Orders'],
-        summary: 'Enqueue a purchase attempt (FIFO) and return queue position',
+        summary: 'Queue a purchase attempt and return live queue position',
         body: {
           type: 'object',
-          additionalProperties: false,
           required: ['email', 'flashSaleId'],
+          additionalProperties: false,
           properties: {
             email: { type: 'string', format: 'email' },
             flashSaleId: { type: 'string' },
@@ -36,7 +36,6 @@ export default async function (app: FastifyInstance) {
         response: {
           200: {
             type: 'object',
-            additionalProperties: false,
             properties: {
               queued: { type: 'boolean' },
               position: { type: 'number' },
@@ -65,12 +64,6 @@ export default async function (app: FastifyInstance) {
               'zsetKey',
             ],
           },
-          503: {
-            type: 'object',
-            additionalProperties: false,
-            properties: { message: { type: 'string' } },
-            required: ['message'],
-          },
         },
       },
     },
@@ -86,38 +79,37 @@ export default async function (app: FastifyInstance) {
       const nowMs = Date.now();
       const qKey = zsetKey(flashSaleId);
 
-      // 1) Fast path: if hold already active, don’t enqueue again
-      const pttl = await redis.pttl(holdKey(flashSaleId, email)); // -2 no key, -1 no expiry, >0 ms
+      // 1️⃣ Check if user already has an active hold
+      const pttl = await redis.pttl(holdKey(flashSaleId, email));
       let hasActiveHold = false;
       let holdTtlSec = 0;
       if (pttl > 0) {
         hasActiveHold = true;
         holdTtlSec = Math.ceil(pttl / 1000);
       } else if (pttl === -1) {
-        // Treat as active to be safe (shouldn't happen if worker sets EX)
         hasActiveHold = true;
         holdTtlSec = HOLD_TTL_SECONDS;
       }
 
-      // 2) Ensure presence in visible queue (NX so we never reset score)
-      //    Read rank & size via pipeline to avoid extra roundtrips
+      // 2️⃣ Add to visible queue (if not already present)
       const pipe = redis.multi();
       pipe.zadd(qKey, 'NX', nowMs, email);
       pipe.zrank(qKey, email);
       pipe.zcard(qKey);
-      const [[, added], [, rankVal], [, sizeVal]] = (await pipe.exec()) as [
-        [null, number], // zadd result (1 added, 0 existed)
+      const [[, _add], [, rankVal], [, sizeVal]] = (await pipe.exec()) as [
+        [null, number],
         [null, number | null],
         [null, number]
       ];
       const position = (rankVal ?? 0) + 1;
       const size = sizeVal;
 
-      // 3) Only enqueue if we don’t already have an active hold
-      let jobId = `${flashSaleId}:${email}:reserve`;
+      // 3️⃣ Only enqueue a reserve job if no active hold
+      const jobId = `${flashSaleId}:${email}:reserve`;
+
       if (!hasActiveHold) {
         try {
-          const job = await queue.add(
+          await queue.add(
             'reserve',
             {
               email,
@@ -126,23 +118,22 @@ export default async function (app: FastifyInstance) {
               holdTtlSec: HOLD_TTL_SECONDS,
             },
             {
-              jobId, // idempotent per (sale,email)
+              jobId,
               removeOnComplete: true,
               removeOnFail: true,
-              attempts: 3, // basic resiliency
+              attempts: 20,
               backoff: { type: 'exponential', delay: 2000 },
             }
           );
-          jobId = String(job.id);
-        } catch (e) {
-          // Surface failure instead of silently returning queued:true with a null job
-          request.log.error({ err: e, flashSaleId, email }, 'queue.add failed');
+        } catch (err) {
+          request.log.error({ err, flashSaleId, email }, 'queue.add failed');
           return reply
             .code(503)
             .send({ message: 'Queue unavailable. Please try again.' });
         }
       }
 
+      // 4️⃣ Respond with queue info + debug fields
       return reply.code(200).send({
         queued: true,
         position,

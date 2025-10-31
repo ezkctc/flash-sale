@@ -1,21 +1,26 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
-import { flashSaleMongoModel, orderMongoModel } from '@flash-sale/shared-types';
+import { orderMongoModel, flashSaleMongoModel } from '@flash-sale/shared-types';
 import { FlashSaleStatus } from '@flash-sale/shared-types';
 import IORedis from 'ioredis';
-import mongoose from 'mongoose';
+import mongoose, { Types } from 'mongoose';
 import { zsetKey, holdKey } from '@flash-sale/shared-utils';
 
 const REDIS_URL = process.env.REDIS_URL ?? 'redis://:redispass@localhost:6379';
-const HOLD_TTL_SECONDS = Number(process.env.HOLD_TTL_SECONDS ?? 900); // 15 mins
+const HOLD_TTL_SECONDS = Number(process.env.HOLD_TTL_SECONDS ?? 900);
+
+// Idempotent confirm gate (prevents double submit)
+const claimKey = (flashSaleId: string, email: string) =>
+  `fshc:${flashSaleId}:${email}`;
+
+// Mark a hold as consumed (so release_hold won’t INCR Redis)
+const consumedKey = (flashSaleId: string, email: string) =>
+  `fshp:${flashSaleId}:${email}`;
 
 type ConfirmBody = {
   email: string;
   flashSaleId: string;
   totalAmount?: number;
 };
-
-const claimKey = (flashSaleId: string, email: string) =>
-  `fshc:${flashSaleId}:${email}`;
 
 export default async function (app: FastifyInstance) {
   const redis = new IORedis(REDIS_URL);
@@ -26,7 +31,7 @@ export default async function (app: FastifyInstance) {
       schema: {
         tags: ['Orders'],
         summary:
-          'Confirm purchase (requires active hold), decrements inventory atomically',
+          'Confirm purchase (requires active hold). Decrements Mongo currentQuantity; Redis was decremented at hold time.',
         body: {
           type: 'object',
           additionalProperties: false,
@@ -44,7 +49,6 @@ export default async function (app: FastifyInstance) {
             properties: {
               ok: { type: 'boolean' },
               orderId: { type: 'string' },
-              inventoryLeft: { type: 'number', nullable: true },
             },
             required: ['ok', 'orderId'],
           },
@@ -54,6 +58,17 @@ export default async function (app: FastifyInstance) {
             required: ['message'],
           },
           409: {
+            type: 'object',
+            additionalProperties: false,
+            properties: {
+              message: { type: 'string' },
+              claimTtlSec: { type: 'number' },
+              holdTtlSec: { type: 'number' },
+              pttlRaw: { type: 'number' },
+            },
+            required: ['message'],
+          },
+          500: {
             type: 'object',
             properties: { message: { type: 'string' } },
             required: ['message'],
@@ -76,105 +91,135 @@ export default async function (app: FastifyInstance) {
           .send({ message: 'Email and flashSaleId are required' });
       }
 
+      // Prepare an _id filter that supports ObjectId or string schemas
+      const isObjId = Types.ObjectId.isValid(flashSaleId);
+      const flashSaleIdValue: any = isObjId
+        ? new Types.ObjectId(flashSaleId)
+        : flashSaleId;
+
       try {
-        // 1) Verify active hold (treat -1 as active defensively)
-        const pttl = await redis.pttl(holdKey(flashSaleId, email)); // -2 no key, -1 no expiry, >=0 ms
-        const holdActive = pttl > 0 || pttl === -1;
-        if (!holdActive) {
+        // 1) Must have an active hold (treat -1 as active defensively)
+        const pttl = await redis.pttl(holdKey(flashSaleId, email)); // -2 no key, -1 no expiry, >=0(ms)
+        if (!(pttl > 0 || pttl === -1)) {
           return reply
             .code(403)
-            .send({ message: 'No active hold found or hold has expired' });
+            .send({ message: 'No active hold or it has expired' });
         }
 
-        // 2) Claim this hold exactly once (idempotency)
-        //    If another confirm already proceeded, this will fail.
-        const seconds = Math.max(60, Math.min(300, HOLD_TTL_SECONDS));
-        const claim = await redis.set(
+        // 2) One purchase per user per sale (fast path)
+        const existingOrder = await orderMongoModel
+          .findOne({ email, flashSaleId: flashSaleIdValue }, { _id: 1 })
+          .lean();
+        if (existingOrder) {
+          return reply
+            .code(200)
+            .send({ ok: true, orderId: String(existingOrder._id) });
+        }
+
+        // 3) Idempotent confirm gate (prevents double-click race)
+        const claimTtlSec = Math.max(60, Math.min(300, HOLD_TTL_SECONDS));
+        const claimSet = await redis.set(
           claimKey(flashSaleId, email),
           '1',
           'EX',
-          seconds,
+          claimTtlSec,
           'NX'
         );
-        if (claim !== 'OK') {
-          return reply
-            .code(409)
-            .send({ message: 'Order already being confirmed' });
+
+        if (claimSet !== 'OK') {
+          // If an order was already created in a parallel confirm, return it
+          const orderNow = await orderMongoModel
+            .findOne({ email, flashSaleId: flashSaleIdValue }, { _id: 1 })
+            .lean();
+          if (orderNow) {
+            return reply
+              .code(200)
+              .send({ ok: true, orderId: String(orderNow._id) });
+          }
+
+          const claimPttl = await redis.pttl(claimKey(flashSaleId, email));
+          const holdPttl = pttl; // from above
+          return reply.code(409).send({
+            message: 'Order is already being confirmed',
+            claimTtlSec: claimPttl > 0 ? Math.ceil(claimPttl / 1000) : 0,
+            holdTtlSec: holdPttl > 0 ? Math.ceil(holdPttl / 1000) : 0,
+            pttlRaw: holdPttl,
+          });
         }
 
-        // 3) Transactionally decrement inventory and create order
-        const session = await mongoose.startSession();
+        // 4) Atomic stock decrement + order creation (no transactions; compensate on failure)
+        let orderId: string | undefined;
         try {
-          session.startTransaction();
-
+          // IMPORTANT:
+          // We rely on date window; status filter can be re-added if your data uses it consistently.
+          // If you are certain about the enum, uncomment status line below.
           const updated = await flashSaleMongoModel.findOneAndUpdate(
             {
-              _id: flashSaleId,
-              status: FlashSaleStatus.OnSchedule,
+              _id: flashSaleIdValue,
+              // status: FlashSaleStatus.OnSchedule,
               startsAt: { $lte: now },
               endsAt: { $gt: now },
               currentQuantity: { $gt: 0 },
             },
             { $inc: { currentQuantity: -1 } },
             {
-              session,
               projection: { currentQuantity: 1 },
               returnDocument: 'after',
             }
           );
 
           if (!updated) {
-            await session.abortTransaction();
+            // Out of stock or not in schedule window
+            await redis.del(claimKey(flashSaleId, email)); // allow retry
             return reply
               .code(409)
-              .send({ message: 'Out of stock or not active' });
+              .send({ message: 'Out of stock or sale not active' });
           }
 
-          const [order] = await orderMongoModel.create(
-            [
-              {
-                email,
-                flashSaleId,
-                totalAmount,
-                paymentStatus: 'paid',
-                createdAt: now,
-                updatedAt: now,
-              },
-            ],
-            { session }
-          );
-
-          await session.commitTransaction();
-
-          // 4) Best-effort cleanup (outside txn)
-          await Promise.allSettled([
-            redis.del(holdKey(flashSaleId, email)), // consume hold
-            redis.zrem(zsetKey(flashSaleId), email), // remove from visible queue if still present
-          ]);
-
-          return reply.code(200).send({
-            ok: true,
-            orderId: String(order._id),
-            inventoryLeft: updated.currentQuantity ?? undefined,
-          });
+          try {
+            const created = await orderMongoModel.create({
+              userEmail: email,
+              flashSaleId: flashSaleIdValue, // match your Order schema type
+              totalAmount,
+              paymentStatus: 'paid',
+              createdAt: now,
+              updatedAt: now,
+            });
+            orderId = String(created._id);
+          } catch (orderErr) {
+            // Compensate inventory on failure
+            await flashSaleMongoModel
+              .updateOne(
+                { _id: flashSaleIdValue },
+                { $inc: { currentQuantity: 1 } }
+              )
+              .catch(() => {});
+            await redis.del(claimKey(flashSaleId, email)); // allow retry
+            request.log.error(orderErr);
+            return reply.code(500).send({ message: 'Failed to confirm order' });
+          }
         } catch (e) {
-          // Abort only if a transaction is active
-          if (session.inTransaction()) {
-            try {
-              await session.abortTransaction();
-            } catch {
-              // ignore
-            }
-          }
+          await redis.del(claimKey(flashSaleId, email)); // allow retry
           request.log.error(e);
           return reply.code(500).send({ message: 'Failed to confirm order' });
-        } finally {
-          try {
-            await session.endSession();
-          } catch {
-            // ignore
-          }
         }
+
+        // 5) Mark this hold as consumed so any delayed release job will NOT INCR Redis
+        await redis.set(
+          consumedKey(flashSaleId, email),
+          '1',
+          'EX',
+          claimTtlSec
+        );
+
+        // 6) Cleanup: remove hold; remove from visible queue if still present; drop claim lock
+        await Promise.allSettled([
+          redis.del(holdKey(flashSaleId, email)),
+          redis.zrem(zsetKey(flashSaleId), email),
+          redis.del(claimKey(flashSaleId, email)),
+        ]);
+
+        return reply.code(200).send({ ok: true, orderId: orderId! });
       } catch (err) {
         request.log.error(err);
         return reply.code(500).send({ message: 'Failed to confirm order' });

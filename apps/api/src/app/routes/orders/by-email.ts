@@ -24,19 +24,6 @@ export default async function (app: FastifyInstance) {
             limit: { type: 'integer', minimum: 1, maximum: 100, default: 20 },
           },
         },
-        response: {
-          200: {
-            type: 'object',
-            additionalProperties: false,
-            properties: {
-              items: { type: 'array', items: { type: 'object' } },
-              total: { type: 'integer' },
-              page: { type: 'integer' },
-              limit: { type: 'integer' },
-            },
-            required: ['items', 'total', 'page', 'limit'],
-          },
-        },
       },
     },
     async function (
@@ -45,7 +32,7 @@ export default async function (app: FastifyInstance) {
     ) {
       try {
         // normalize email for consistent querying
-        const email = request.query.email.trim().toLowerCase();
+        const email = decodeURIComponent(request.query.email).trim();
         const page = Math.max(1, Number(request.query.page ?? 1));
         const raw = Number(request.query.limit ?? 20);
         const limit = Math.min(100, Math.max(1, raw));
@@ -53,15 +40,13 @@ export default async function (app: FastifyInstance) {
 
         const filter = { userEmail: email };
 
-        const [items, total] = await Promise.all([
-          orderMongoModel
-            .find(filter)
-            .sort({ createdAt: -1 }) // latest first
-            .skip(skip)
-            .limit(limit)
-            .lean(),
-          orderMongoModel.countDocuments(filter),
-        ]);
+        const items = await orderMongoModel
+          .find(filter)
+          .sort({ createdAt: -1 }) // latest first
+          .skip(skip)
+          .limit(limit)
+          .lean();
+        const total = await orderMongoModel.countDocuments(filter);
 
         return reply.code(200).send({ items, total, page, limit });
       } catch (error) {
