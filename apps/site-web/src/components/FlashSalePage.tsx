@@ -6,7 +6,7 @@ import { ReloadOutlined } from '@ant-design/icons';
 import { toast } from 'react-toastify';
 
 import type { FlashSaleResponse } from '@/types';
-import { flashSaleService, queueService } from '@/services';
+import { flashSaleService, queueService, orderService } from '@/services';
 import { storageUtil } from '@/utils';
 import { QueuePosition } from '@/types';
 
@@ -46,7 +46,7 @@ export function FlashSalePage() {
     try {
       const data = await flashSaleService.getCurrentSale();
       setFlashSale(data);
-      
+
       // Reset countdown completion if we get a new sale
       if (data.meta.status === 'upcoming') {
         setCountdownCompleted(false);
@@ -62,9 +62,10 @@ export function FlashSalePage() {
     if (!userEmail || !flashSale?.item?._id) return;
 
     // Don't check queue if sale is sold out
-    const isSoldOut = flashSale.meta.soldOut || 
+    const isSoldOut =
+      flashSale.meta.soldOut ||
       (flashSale.meta.progress && flashSale.meta.progress.remaining <= 0);
-    
+
     if (isSoldOut) {
       setQueueStatus(null);
       return;
@@ -72,14 +73,21 @@ export function FlashSalePage() {
 
     // Check if user has already purchased this flash sale
     try {
-      const ordersResponse = await orderService.getOrdersByEmail(userEmail, 1, 10);
+      const ordersResponse = await orderService.getOrdersByEmail(
+        userEmail,
+        1,
+        10
+      );
       setUserOrders(ordersResponse.items);
-      
+
       const hasPurchasedThisSale = ordersResponse.items.some(
-        order => order.flashSaleId === flashSale.item._id && order.paymentStatus === 'paid'
+        (order) =>
+          flashSale.item &&
+          order.flashSaleId === flashSale.item._id &&
+          order.paymentStatus === 'paid'
       );
       setHasPurchased(hasPurchasedThisSale);
-      
+
       if (hasPurchasedThisSale) {
         return; // Don't check queue if already purchased
       }
@@ -136,7 +144,7 @@ export function FlashSalePage() {
 
   const handleCountdownComplete = () => {
     setCountdownCompleted(true);
-    setForceUpdate(prev => prev + 1); // Force re-render
+    setForceUpdate((prev) => prev + 1); // Force re-render
     // Refresh flash sale data to get updated status
     fetchFlashSale();
     toast.success('🎉 Flash sale is now live!');

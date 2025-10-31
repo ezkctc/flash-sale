@@ -177,6 +177,7 @@ export default async function (app: FastifyInstance) {
             const created = await orderMongoModel.create({
               userEmail: email,
               flashSaleId: flashSaleIdValue,
+              flashSaleName: updated.name,
               totalAmount,
               paymentStatus: 'paid',
               createdAt: now,

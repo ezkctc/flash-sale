@@ -104,11 +104,11 @@ export function UserOrders({ userEmail }: UserOrdersProps) {
     },
     {
       title: 'Flash Sale',
-      dataIndex: 'flashSaleId',
-      key: 'flashSaleId',
-      render: (id: string) => (
+      dataIndex: 'flashSaleName',
+      key: 'flashSaleName',
+      render: (name: string) => (
         <Text code style={{ fontSize: 12 }}>
-          {id ? id.toString() : 'N/A'}
+          {name ? name : 'N/A'}
         </Text>
       ),
     },

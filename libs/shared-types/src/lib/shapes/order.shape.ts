@@ -5,6 +5,7 @@ export interface OrderShape {
   _id?: ObjectId;
   userEmail: string;
   flashSaleId?: ObjectId;
+  flashSaleName?: string;
   paymentStatus: PaymentStatus;
   totalAmount?: number;
   createdAt?: Date;

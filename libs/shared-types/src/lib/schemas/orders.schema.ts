@@ -11,7 +11,7 @@ export const orderSchema = new Schema(
   {
     // Reference to the user (optional if email is stored directly)
     userEmail: { type: String, trim: true, required: true, index: true },
-
+    flashSaleName: { type: String, trim: true, required: false },
     // Reference to a Flash Sale if order belongs to one
     flashSaleId: {
       type: Schema.Types.ObjectId,
