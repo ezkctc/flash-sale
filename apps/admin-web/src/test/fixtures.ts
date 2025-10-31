@@ -23,7 +23,7 @@ export const mockFlashSales: FlashSaleShape[] = [
     endsAt: new Date('2025-12-02T12:00:00Z'),
     startingQuantity: 50,
     currentQuantity: 25,
-    status: 'Active',
+    status: 'OnSchedule',
     createdAt: new Date('2025-11-02T00:00:00Z'),
     updatedAt: new Date('2025-11-02T00:00:00Z'),
   },

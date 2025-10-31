@@ -1,8 +1,8 @@
-import { ObjectId } from 'mongoose';
+import { ObjectId, Schema } from 'mongoose';
 import { FlashSaleStatus } from '../enums/index.js';
 
 export interface FlashSaleShape {
-  _id?: ObjectId;
+  _id?: Schema.Types.ObjectId | string;
   name: string;
   description?: string;
   startsAt: Date;
@@ -10,7 +10,7 @@ export interface FlashSaleShape {
   currentQuantity: number;
   startingQuantity: number;
   productId?: ObjectId;
-  status: FlashSaleStatus;
+  status: FlashSaleStatus | string;
   createdAt?: Date;
   updatedAt?: Date;
 }
