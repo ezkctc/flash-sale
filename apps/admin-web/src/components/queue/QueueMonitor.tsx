@@ -1,7 +1,18 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Card, Table, Tag, Space, Button, Select, Statistic, Row, Col, Divider } from 'antd';
+import {
+  Card,
+  Table,
+  Tag,
+  Space,
+  Button,
+  Select,
+  Statistic,
+  Row,
+  Col,
+  Divider,
+} from 'antd';
 import { ReloadOutlined, EyeOutlined } from '@ant-design/icons';
 import { toast } from 'react-toastify';
 import { apiFetch } from '@/lib/services/api';
@@ -44,7 +55,12 @@ export function QueueMonitor() {
     queueName: string;
     flashSaleId: string;
     head: QueueMember[];
-    holds: Array<{ key: string; email: string; ttlSec: number; inQueue: boolean }>;
+    holds: Array<{
+      key: string;
+      email: string;
+      ttlSec: number;
+      inQueue: boolean;
+    }>;
     otherQueues: Array<{ saleId: string; size: number }>;
     strays: QueueMember[];
   } | null>(null);
@@ -58,7 +74,9 @@ export function QueueMonitor() {
   useEffect(() => {
     const loadFlashSales = async () => {
       try {
-        const response = await apiFetch<{ items: FlashSaleShape[] }>('/flash-sales');
+        const response = await apiFetch<{ items: FlashSaleShape[] }>(
+          '/flash-sales'
+        );
         setFlashSales(response.items);
         if (response.items.length > 0 && !selectedSaleId) {
           setSelectedSaleId(response.items[0]._id?.toString() || '');
@@ -73,7 +91,7 @@ export function QueueMonitor() {
   // Load queue overview
   const loadOverview = async () => {
     if (!selectedSaleId) return;
-    
+
     setLoading(true);
     try {
       const response = await apiFetch<QueueOverview>(
@@ -98,7 +116,9 @@ export function QueueMonitor() {
         total: number;
         page: number;
         limit: number;
-      }>(`/orders/admin/queue/members?flashSaleId=${selectedSaleId}&page=${page}&limit=${pageSize}`);
+      }>(
+        `/orders/admin/queue/members?flashSaleId=${selectedSaleId}&page=${page}&limit=${pageSize}`
+      );
 
       setMembers(response.items);
       setPagination({
@@ -150,7 +170,11 @@ export function QueueMonitor() {
         if (ttl > 0) {
           const minutes = Math.floor(ttl / 60);
           const seconds = ttl % 60;
-          return <Tag color="green">{minutes}m {seconds}s</Tag>;
+          return (
+            <Tag color="green">
+              {minutes}m {seconds}s
+            </Tag>
+          );
         }
         return <Tag color="gray">No Hold</Tag>;
       },
@@ -162,7 +186,9 @@ export function QueueMonitor() {
     if (!selectedSaleId) return;
     setAuditLoading(true);
     try {
-      const res = await apiFetch(`/orders/admin/queue/audit?flashSaleId=${selectedSaleId}&sample=100`);
+      const res = await apiFetch(
+        `/orders/admin/queue/audit?flashSaleId=${selectedSaleId}&sample=100`
+      );
       setAudit(res as any);
     } catch (e: any) {
       toast.error('Failed to load audit');
@@ -280,7 +306,11 @@ export function QueueMonitor() {
         title="Audit Snapshot"
         extra={
           <Space>
-            <Button icon={<ReloadOutlined />} onClick={loadAudit} loading={auditLoading}>
+            <Button
+              icon={<ReloadOutlined />}
+              onClick={loadAudit}
+              loading={auditLoading}
+            >
               Refresh Audit
             </Button>
           </Space>
@@ -292,10 +322,12 @@ export function QueueMonitor() {
               <strong>Queue:</strong> {audit?.queueName || '—'}
             </div>
             <div>
-              <strong>Flash Sale:</strong> {audit?.flashSaleId || selectedSaleId || '—'}
+              <strong>Flash Sale:</strong>{' '}
+              {audit?.flashSaleId || selectedSaleId || '—'}
             </div>
             <div>
-              <strong>Captured:</strong> {audit?.ts ? new Date(audit.ts).toLocaleString() : '—'}
+              <strong>Captured:</strong>{' '}
+              {audit?.ts ? new Date(audit.ts).toLocaleString() : '—'}
             </div>
           </Space>
         </div>
@@ -319,14 +351,16 @@ export function QueueMonitor() {
               dataIndex: 'ttlSec',
               key: 'ttlSec',
               width: 140,
-              render: (ttl: number) => (ttl > 0 ? <Tag color="green">{ttl}s</Tag> : <Tag>No TTL</Tag>),
+              render: (ttl: number) =>
+                ttl > 0 ? <Tag color="green">{ttl}s</Tag> : <Tag>No TTL</Tag>,
             },
             {
               title: 'In Queue',
               dataIndex: 'inQueue',
               key: 'inQueue',
               width: 120,
-              render: (b: boolean) => (b ? <Tag color="orange">Yes</Tag> : <Tag color="blue">No</Tag>),
+              render: (b: boolean) =>
+                b ? <Tag color="orange">Yes</Tag> : <Tag color="blue">No</Tag>,
             },
             { title: 'Key', dataIndex: 'key', key: 'key' },
           ]}

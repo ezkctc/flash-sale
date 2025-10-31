@@ -2,7 +2,7 @@
 
 import { Form, Input, DatePicker, InputNumber, Typography } from 'antd';
 import dayjs, { Dayjs } from 'dayjs';
-
+import React from 'react';
 const { Text } = Typography;
 
 type Props = {

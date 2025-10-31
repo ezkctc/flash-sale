@@ -6,16 +6,18 @@ import {
   updateFlashSale,
   deleteFlashSale,
 } from './flash-sales';
-import { mockFlashSale, mockFlashSales } from '@/test/fixtures';
-import { setupLocalStorage, mockSuccessResponse, mockErrorResponse } from '@/test/test-utils';
+import { mockFlashSale, mockFlashSales } from '../../../src/test/fixtures';
+import {
+  setupLocalStorage,
+  mockSuccessResponse,
+  mockErrorResponse,
+} from '../../../src/test/test-utils';
 
 vi.mock('./api', async () => {
-  const actual = await vi.importActual('./api');
-  return {
-    ...actual,
-    apiFetch: vi.fn(),
-  };
+  const actual = await vi.importActual<typeof import('./api')>('./api');
+  return { ...actual, apiFetch: vi.fn() };
 });
+import * as apiModule from './api';
 
 describe('Flash Sales Service', () => {
   let mockApiFetch: ReturnType<typeof vi.fn>;
@@ -25,8 +27,7 @@ describe('Flash Sales Service', () => {
     mockStorage = setupLocalStorage();
     mockStorage.setItem('auth_token', 'test-token');
 
-    const { apiFetch } = require('./api');
-    mockApiFetch = apiFetch;
+    mockApiFetch = (apiModule as any).apiFetch as any;
     vi.clearAllMocks();
   });
 
@@ -69,7 +70,9 @@ describe('Flash Sales Service', () => {
 
       const result = await getFlashSale('507f1f77bcf86cd799439011');
 
-      expect(mockApiFetch).toHaveBeenCalledWith('/flash-sales/507f1f77bcf86cd799439011');
+      expect(mockApiFetch).toHaveBeenCalledWith(
+        '/flash-sales/507f1f77bcf86cd799439011'
+      );
       expect(result).toEqual(mockFlashSale);
     });
 
@@ -82,7 +85,9 @@ describe('Flash Sales Service', () => {
     it('should handle API errors', async () => {
       mockApiFetch.mockRejectedValue(new Error('Server error'));
 
-      await expect(getFlashSale('507f1f77bcf86cd799439011')).rejects.toThrow('Server error');
+      await expect(getFlashSale('507f1f77bcf86cd799439011')).rejects.toThrow(
+        'Server error'
+      );
     });
   });
 
@@ -112,28 +117,38 @@ describe('Flash Sales Service', () => {
       const invalidSale = { name: '' };
       mockApiFetch.mockRejectedValue(new Error('Validation failed'));
 
-      await expect(createFlashSale(invalidSale as any)).rejects.toThrow('Validation failed');
+      await expect(createFlashSale(invalidSale as any)).rejects.toThrow(
+        'Validation failed'
+      );
     });
 
     it('should handle server errors', async () => {
       mockApiFetch.mockRejectedValue(new Error('Server error'));
 
-      await expect(createFlashSale(mockFlashSale)).rejects.toThrow('Server error');
+      await expect(createFlashSale(mockFlashSale)).rejects.toThrow(
+        'Server error'
+      );
     });
   });
 
   describe('updateFlashSale', () => {
     it('should update existing flash sale', async () => {
-      const updates = { name: 'Updated Name', description: 'Updated description' };
+      const updates = {
+        name: 'Updated Name',
+        description: 'Updated description',
+      };
       const mockResponse = { updated: 1 };
       mockApiFetch.mockResolvedValue(mockResponse);
 
       const result = await updateFlashSale('507f1f77bcf86cd799439011', updates);
 
-      expect(mockApiFetch).toHaveBeenCalledWith('/flash-sales/507f1f77bcf86cd799439011', {
-        method: 'PUT',
-        body: JSON.stringify(updates),
-      });
+      expect(mockApiFetch).toHaveBeenCalledWith(
+        '/flash-sales/507f1f77bcf86cd799439011',
+        {
+          method: 'PUT',
+          body: JSON.stringify(updates),
+        }
+      );
       expect(result).toEqual(mockResponse);
     });
 
@@ -150,15 +165,17 @@ describe('Flash Sales Service', () => {
     it('should handle non-existent flash sale', async () => {
       mockApiFetch.mockRejectedValue(new Error('Not found'));
 
-      await expect(updateFlashSale('invalid-id', { name: 'Test' })).rejects.toThrow('Not found');
+      await expect(
+        updateFlashSale('invalid-id', { name: 'Test' })
+      ).rejects.toThrow('Not found');
     });
 
     it('should handle validation errors', async () => {
       mockApiFetch.mockRejectedValue(new Error('Validation failed'));
 
-      await expect(updateFlashSale('507f1f77bcf86cd799439011', { name: '' })).rejects.toThrow(
-        'Validation failed'
-      );
+      await expect(
+        updateFlashSale('507f1f77bcf86cd799439011', { name: '' })
+      ).rejects.toThrow('Validation failed');
     });
   });
 
@@ -169,9 +186,12 @@ describe('Flash Sales Service', () => {
 
       const result = await deleteFlashSale('507f1f77bcf86cd799439011');
 
-      expect(mockApiFetch).toHaveBeenCalledWith('/flash-sales/507f1f77bcf86cd799439011', {
-        method: 'DELETE',
-      });
+      expect(mockApiFetch).toHaveBeenCalledWith(
+        '/flash-sales/507f1f77bcf86cd799439011',
+        {
+          method: 'DELETE',
+        }
+      );
       expect(result).toEqual(mockResponse);
     });
 
@@ -184,7 +204,9 @@ describe('Flash Sales Service', () => {
     it('should handle server errors', async () => {
       mockApiFetch.mockRejectedValue(new Error('Server error'));
 
-      await expect(deleteFlashSale('507f1f77bcf86cd799439011')).rejects.toThrow('Server error');
+      await expect(deleteFlashSale('507f1f77bcf86cd799439011')).rejects.toThrow(
+        'Server error'
+      );
     });
 
     it('should accept various ID types', async () => {
@@ -205,8 +227,12 @@ describe('Flash Sales Service', () => {
 
       await expect(listFlashSales()).rejects.toThrow('Network failure');
       await expect(getFlashSale('id')).rejects.toThrow('Network failure');
-      await expect(createFlashSale({} as any)).rejects.toThrow('Network failure');
-      await expect(updateFlashSale('id', {})).rejects.toThrow('Network failure');
+      await expect(createFlashSale({} as any)).rejects.toThrow(
+        'Network failure'
+      );
+      await expect(updateFlashSale('id', {})).rejects.toThrow(
+        'Network failure'
+      );
       await expect(deleteFlashSale('id')).rejects.toThrow('Network failure');
     });
 

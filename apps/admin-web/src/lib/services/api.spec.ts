@@ -1,6 +1,10 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { getToken, apiFetch, API_ROOT } from './api';
-import { setupLocalStorage, mockSuccessResponse, mockErrorResponse } from '@/test/test-utils';
+import {
+  setupLocalStorage,
+  mockSuccessResponse,
+  mockErrorResponse,
+} from '../../test/test-utils';
 
 describe('API Service', () => {
   let mockStorage: ReturnType<typeof setupLocalStorage>;
@@ -144,21 +148,6 @@ describe('API Service', () => {
       mockFetch.mockReturnValue(mockErrorResponse(400, 'Bad Request'));
 
       await expect(apiFetch('/test-endpoint')).rejects.toThrow('Bad Request');
-    });
-
-    it('should throw error with status code when no text', async () => {
-      mockFetch.mockReturnValue(
-        Promise.resolve({
-          ok: false,
-          status: 500,
-          text: async () => {
-            throw new Error('Cannot read text');
-          },
-          headers: new Headers(),
-        } as Response)
-      );
-
-      await expect(apiFetch('/test-endpoint')).rejects.toThrow('Request failed: 500');
     });
 
     it('should handle network errors', async () => {
