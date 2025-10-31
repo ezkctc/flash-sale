@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import {
   listFlashSales,
@@ -24,6 +25,7 @@ describe('Flash Sales Service', () => {
   let mockStorage: ReturnType<typeof setupLocalStorage>;
 
   beforeEach(() => {
+    // This line now runs successfully because the environment is jsdom
     mockStorage = setupLocalStorage();
     mockStorage.setItem('auth_token', 'test-token');
 

@@ -20,7 +20,7 @@
     "redis:show": "node scripts/redis-display.js",
     "redis:monitor": "node scripts/redis-monitor.js monitor",
     "redis:watch": "node scripts/redis-monitor.js watch",
-    "test": "concurrently -n api,worker,admin,site -c auto \"npm:test:api\" \"npm:test:worker\" \"npm:test:admin\" \"npm:test:site\"",
+    "test": "npm run test:api && npm run test:worker && npm run test:admin && npm run test:site",
     "test:api": "vitest --config apps/api/vitest.config.ts",
     "test:worker": "vitest --config apps/worker/vitest.config.ts",
     "test:admin": "vitest --config apps/admin-web/vitest.config.ts",

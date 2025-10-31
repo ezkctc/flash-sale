@@ -52,13 +52,16 @@ export function mockLocalStorage() {
 
 export function setupLocalStorage() {
   const mockStorage = mockLocalStorage();
-  Object.defineProperty(window, 'localStorage', {
-    value: mockStorage,
-    writable: true,
-  });
+
+  if (typeof window !== 'undefined') {
+    Object.defineProperty(window, 'localStorage', {
+      value: mockStorage,
+      writable: true,
+    });
+  }
+
   return mockStorage;
 }
-
 const AllTheProviders = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
