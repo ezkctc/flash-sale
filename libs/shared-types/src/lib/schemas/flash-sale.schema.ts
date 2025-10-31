@@ -14,7 +14,6 @@ export const flashSaleSchema = new Schema(
       type: String,
       trim: true,
       required: true,
-      index: true,
       default: 'product',
     },
 
@@ -26,8 +25,8 @@ export const flashSaleSchema = new Schema(
     },
 
     // Start and end datetime for the sale window
-    startsAt: { type: Date, required: true, index: true },
-    endsAt: { type: Date, required: true, index: true },
+    startsAt: { type: Date, required: true },
+    endsAt: { type: Date, required: true },
 
     // Inventory tracking
 
@@ -45,7 +44,6 @@ export const flashSaleSchema = new Schema(
       type: String,
       enum: FlashSaleStatus,
       default: FlashSaleStatus.OnSchedule,
-      index: true,
     },
   },
   {
@@ -53,6 +51,45 @@ export const flashSaleSchema = new Schema(
     timestamps: true,
   }
 );
+
+// Compound indexes for common query patterns
+
+// 1. Admin list queries with filtering and sorting
+flashSaleSchema.index({ status: 1, createdAt: -1 });
+flashSaleSchema.index({ name: 'text' }); // Text search on name
+
+// 2. Public sale queries - find active sales
+flashSaleSchema.index({ 
+  status: 1, 
+  startsAt: 1, 
+  endsAt: 1 
+});
+
+// 3. Time window queries for overlap detection
+flashSaleSchema.index({ 
+  status: 1, 
+  startsAt: 1, 
+  endsAt: 1, 
+  productId: 1 
+});
+
+// 4. Inventory and time-based queries for worker
+flashSaleSchema.index({ 
+  _id: 1, 
+  status: 1, 
+  startsAt: 1, 
+  endsAt: 1, 
+  currentQuantity: 1 
+});
+
+// 5. Date range queries for admin filtering
+flashSaleSchema.index({ startsAt: 1, endsAt: 1 });
+
+// 6. Single field indexes for common filters
+flashSaleSchema.index({ status: 1 });
+flashSaleSchema.index({ createdAt: -1 });
+flashSaleSchema.index({ startsAt: 1 });
+flashSaleSchema.index({ endsAt: 1 });
 
 // 👇 Export Mongoose model
 export const flashSaleMongoModel = model<FlashSaleShape>(

@@ -37,6 +37,21 @@ async function mongoPlugin(fastify: FastifyInstance) {
         .collection('sessions')
         .createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 });
       fastify.log.info('Ensured TTL index on sessions.expiresAt');
+      
+      // Create additional indexes for Better Auth collections
+      await db
+        .collection('sessions')
+        .createIndex({ token: 1 }, { unique: true });
+      
+      await db
+        .collection('sessions')
+        .createIndex({ userId: 1 });
+        
+      await db
+        .collection('users')
+        .createIndex({ email: 1 }, { unique: true });
+        
+      fastify.log.info('Ensured auth indexes on sessions and users');
     } catch (e) {
       fastify.log.error(e as any, 'Failed creating TTL index on sessions');
     }
