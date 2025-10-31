@@ -27,18 +27,6 @@ export default async function (app: FastifyInstance) {
             flashSaleId: { type: 'string' },
           },
         },
-        response: {
-          200: {
-            type: 'object',
-            properties: {
-              items: { type: 'array', items: { type: 'object' } },
-              total: { type: 'number' },
-              page: { type: 'number' },
-              limit: { type: 'number' },
-            },
-            required: ['items', 'total', 'page', 'limit'],
-          },
-        },
       },
     },
     async function (

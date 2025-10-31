@@ -108,7 +108,7 @@ export function UserOrders({ userEmail }: UserOrdersProps) {
       key: 'flashSaleId',
       render: (id: string) => (
         <Text code style={{ fontSize: 12 }}>
-          {id ? id.slice(-8) : 'N/A'}
+          {id ? id.toString() : 'N/A'}
         </Text>
       ),
     },

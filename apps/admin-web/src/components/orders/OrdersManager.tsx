@@ -1,7 +1,16 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Card, Table, Tag, Space, Button, Input, Select, DatePicker } from 'antd';
+import {
+  Card,
+  Table,
+  Tag,
+  Space,
+  Button,
+  Input,
+  Select,
+  DatePicker,
+} from 'antd';
 import { SearchOutlined, ReloadOutlined } from '@ant-design/icons';
 import { toast } from 'react-toastify';
 import dayjs from 'dayjs';
@@ -44,7 +53,8 @@ export function OrdersManager() {
       });
 
       if (filters.userEmail) params.append('userEmail', filters.userEmail);
-      if (filters.flashSaleId) params.append('flashSaleId', filters.flashSaleId);
+      if (filters.flashSaleId)
+        params.append('flashSaleId', filters.flashSaleId);
 
       const response = await apiFetch<{
         items: Order[];
@@ -78,7 +88,7 @@ export function OrdersManager() {
         key: '_id',
         width: 120,
         render: (id: string) => (
-          <span className="font-mono text-xs">{id.slice(-8)}</span>
+          <span className="font-mono text-xs">{id.toString()}</span>
         ),
       },
       {
@@ -93,7 +103,7 @@ export function OrdersManager() {
         key: 'flashSaleId',
         width: 120,
         render: (id: string) => (
-          <span className="font-mono text-xs">{id?.slice(-8) || 'N/A'}</span>
+          <span className="font-mono text-xs">{id.toString() || 'N/A'}</span>
         ),
       },
       {
@@ -102,13 +112,14 @@ export function OrdersManager() {
         key: 'paymentStatus',
         width: 100,
         render: (status: string) => {
-          const color = {
-            pending: 'orange',
-            paid: 'green',
-            failed: 'red',
-            refunded: 'purple',
-            cancelled: 'gray',
-          }[status] || 'default';
+          const color =
+            {
+              pending: 'orange',
+              paid: 'green',
+              failed: 'red',
+              refunded: 'purple',
+              cancelled: 'gray',
+            }[status] || 'default';
           return <Tag color={color}>{status}</Tag>;
         },
       },
@@ -135,7 +146,7 @@ export function OrdersManager() {
   };
 
   const handleSearch = () => {
-    setPagination(prev => ({ ...prev, current: 1 }));
+    setPagination((prev) => ({ ...prev, current: 1 }));
     loadOrders(1, pagination.pageSize);
   };
 
@@ -146,7 +157,7 @@ export function OrdersManager() {
       paymentStatus: '',
       dateRange: null,
     });
-    setPagination(prev => ({ ...prev, current: 1 }));
+    setPagination((prev) => ({ ...prev, current: 1 }));
     loadOrders(1, pagination.pageSize);
   };
 
@@ -164,20 +175,26 @@ export function OrdersManager() {
           <Input
             placeholder="Search by email"
             value={filters.userEmail}
-            onChange={(e) => setFilters(prev => ({ ...prev, userEmail: e.target.value }))}
+            onChange={(e) =>
+              setFilters((prev) => ({ ...prev, userEmail: e.target.value }))
+            }
             style={{ width: 200 }}
             prefix={<SearchOutlined />}
           />
           <Input
             placeholder="Flash Sale ID"
             value={filters.flashSaleId}
-            onChange={(e) => setFilters(prev => ({ ...prev, flashSaleId: e.target.value }))}
+            onChange={(e) =>
+              setFilters((prev) => ({ ...prev, flashSaleId: e.target.value }))
+            }
             style={{ width: 150 }}
           />
           <Select
             placeholder="Payment Status"
             value={filters.paymentStatus || undefined}
-            onChange={(value) => setFilters(prev => ({ ...prev, paymentStatus: value || '' }))}
+            onChange={(value) =>
+              setFilters((prev) => ({ ...prev, paymentStatus: value || '' }))
+            }
             style={{ width: 150 }}
             allowClear
           >
@@ -195,7 +212,7 @@ export function OrdersManager() {
       </div>
 
       <Table
-        rowKey="_id"
+        rowKey={(record) => record._id?.toString() || ''}
         columns={columns}
         dataSource={orders}
         loading={loading}

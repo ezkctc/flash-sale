@@ -2,7 +2,12 @@
 
 import { useEffect, useState } from 'react';
 import { Card, Row, Col, Statistic, Table, Tag } from 'antd';
-import { ShoppingCartOutlined, UserOutlined, DollarOutlined, ClockCircleOutlined } from '@ant-design/icons';
+import {
+  ShoppingCartOutlined,
+  UserOutlined,
+  DollarOutlined,
+  ClockCircleOutlined,
+} from '@ant-design/icons';
 import { toast } from 'react-toastify';
 import dayjs from 'dayjs';
 import { apiFetch } from '@/lib/services/api';
@@ -32,32 +37,39 @@ export function AnalyticsDashboard() {
     setLoading(true);
     try {
       // Load flash sales
-      const salesResponse = await apiFetch<{ items: FlashSaleShape[] }>('/flash-sales');
+      const salesResponse = await apiFetch<{ items: FlashSaleShape[] }>(
+        '/flash-sales'
+      );
       const sales = salesResponse.items;
 
       // Load recent orders
-      const ordersResponse = await apiFetch<{ items: any[] }>('/orders/admin/list-admin?limit=10');
+      const ordersResponse = await apiFetch<{ items: any[] }>(
+        '/orders/admin/list-admin?limit=10'
+      );
       const orders = ordersResponse.items;
 
       // Calculate analytics
       const now = new Date();
-      const activeSales = sales.filter(sale => {
+      const activeSales = sales.filter((sale) => {
         const start = new Date(sale.startsAt);
         const end = new Date(sale.endsAt);
         return start <= now && now <= end;
       }).length;
 
       const totalRevenue = orders
-        .filter(order => order.paymentStatus === 'paid')
+        .filter((order) => order.paymentStatus === 'paid')
         .reduce((sum, order) => sum + (order.totalAmount || 0), 0);
 
-      const paidOrders = orders.filter(order => order.paymentStatus === 'paid').length;
+      const paidOrders = orders.filter(
+        (order) => order.paymentStatus === 'paid'
+      ).length;
 
       // Top sales by sold quantity
       const topSales = sales
-        .map(sale => ({
+        .map((sale) => ({
           ...sale,
-          soldQuantity: (sale.startingQuantity || 0) - (sale.currentQuantity || 0)
+          soldQuantity:
+            (sale.startingQuantity || 0) - (sale.currentQuantity || 0),
         }))
         .sort((a, b) => b.soldQuantity - a.soldQuantity)
         .slice(0, 5);
@@ -86,7 +98,9 @@ export function AnalyticsDashboard() {
       title: 'Order ID',
       dataIndex: '_id',
       key: '_id',
-      render: (id: string) => <span className="font-mono text-xs">{id.slice(-8)}</span>,
+      render: (id: string) => (
+        <span className="font-mono text-xs">{id.toString()}</span>
+      ),
     },
     {
       title: 'Email',
@@ -98,13 +112,14 @@ export function AnalyticsDashboard() {
       dataIndex: 'paymentStatus',
       key: 'paymentStatus',
       render: (status: string) => {
-        const color = {
-          pending: 'orange',
-          paid: 'green',
-          failed: 'red',
-          refunded: 'purple',
-          cancelled: 'gray',
-        }[status] || 'default';
+        const color =
+          {
+            pending: 'orange',
+            paid: 'green',
+            failed: 'red',
+            refunded: 'purple',
+            cancelled: 'gray',
+          }[status] || 'default';
         return <Tag color={color}>{status}</Tag>;
       },
     },
@@ -132,7 +147,9 @@ export function AnalyticsDashboard() {
       title: 'Sold',
       key: 'sold',
       render: (_: any, record: any) => (
-        <span>{record.soldQuantity} / {record.startingQuantity}</span>
+        <span>
+          {record.soldQuantity} / {record.startingQuantity}
+        </span>
       ),
     },
     {
@@ -142,10 +159,10 @@ export function AnalyticsDashboard() {
         const now = new Date();
         const start = new Date(record.startsAt);
         const end = new Date(record.endsAt);
-        
+
         let status = 'upcoming';
         let color = 'blue';
-        
+
         if (start <= now && now <= end) {
           status = 'active';
           color = 'green';
@@ -153,7 +170,7 @@ export function AnalyticsDashboard() {
           status = 'ended';
           color = 'gray';
         }
-        
+
         return <Tag color={color}>{status}</Tag>;
       },
     },
@@ -162,7 +179,8 @@ export function AnalyticsDashboard() {
       key: 'period',
       render: (_: any, record: FlashSaleShape) => (
         <span className="text-xs">
-          {dayjs(record.startsAt).format('MM-DD HH:mm')} - {dayjs(record.endsAt).format('MM-DD HH:mm')}
+          {dayjs(record.startsAt).format('MM-DD HH:mm')} -{' '}
+          {dayjs(record.endsAt).format('MM-DD HH:mm')}
         </span>
       ),
     },
@@ -218,7 +236,7 @@ export function AnalyticsDashboard() {
         <Col span={12}>
           <Card title="Recent Orders" size="small">
             <Table
-              rowKey="_id"
+              rowKey={(record) => record._id?.toString() || ''}
               columns={orderColumns}
               dataSource={data.recentOrders}
               pagination={false}
