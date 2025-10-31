@@ -1,7 +1,7 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { orderMongoModel, flashSaleMongoModel } from '@flash-sale/shared-types';
 import { FlashSaleStatus } from '@flash-sale/shared-types';
-import IORedis from 'ioredis';
+import { Redis } from 'ioredis';
 import mongoose, { Types } from 'mongoose';
 import { zsetKey, holdKey } from '@flash-sale/shared-utils';
 
@@ -23,7 +23,7 @@ type ConfirmBody = {
 };
 
 export default async function (app: FastifyInstance) {
-  const redis = new IORedis(REDIS_URL);
+  const redis = new Redis(REDIS_URL);
 
   app.post<{ Body: ConfirmBody }>(
     '/confirm',
@@ -150,9 +150,6 @@ export default async function (app: FastifyInstance) {
         // 4) Atomic stock decrement + order creation (no transactions; compensate on failure)
         let orderId: string | undefined;
         try {
-          // IMPORTANT:
-          // We rely on date window; status filter can be re-added if your data uses it consistently.
-          // If you are certain about the enum, uncomment status line below.
           const updated = await flashSaleMongoModel.findOneAndUpdate(
             {
               _id: flashSaleIdValue,
@@ -179,7 +176,7 @@ export default async function (app: FastifyInstance) {
           try {
             const created = await orderMongoModel.create({
               userEmail: email,
-              flashSaleId: flashSaleIdValue, // match your Order schema type
+              flashSaleId: flashSaleIdValue,
               totalAmount,
               paymentStatus: 'paid',
               createdAt: now,
@@ -205,11 +202,12 @@ export default async function (app: FastifyInstance) {
         }
 
         // 5) Mark this hold as consumed so any delayed release job will NOT INCR Redis
+        // ⚠️ IMPORTANT: keep consumed flag alive at least as long as the hold TTL (plus small buffer)
         await redis.set(
           consumedKey(flashSaleId, email),
           '1',
           'EX',
-          claimTtlSec
+          HOLD_TTL_SECONDS + 120
         );
 
         // 6) Cleanup: remove hold; remove from visible queue if still present; drop claim lock

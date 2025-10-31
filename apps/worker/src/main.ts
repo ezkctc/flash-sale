@@ -1,6 +1,6 @@
 import 'dotenv/config';
-import { Worker, Queue, Job } from 'bullmq';
-import IORedis from 'ioredis';
+import { Worker, Queue, Job, QueueEvents } from 'bullmq'; // v5: no QueueScheduler
+import { Redis } from 'ioredis';
 import mongoose, { Types } from 'mongoose';
 import { flashSaleMongoModel, FlashSaleStatus } from '@flash-sale/shared-types';
 import { zsetKey, holdKey, consumedKey } from '@flash-sale/shared-utils';
@@ -13,37 +13,56 @@ const QUEUE_NAME = process.env.QUEUE_NAME ?? 'sale-processing-queue';
 const BULL_PREFIX = process.env.BULLMQ_PREFIX ?? 'flashsale';
 
 const HOLD_TTL_SECONDS = Number(process.env.HOLD_TTL_SECONDS ?? 900);
-const NOT_FIRST_DELAY_MS = Number(process.env.NOT_FIRST_DELAY_MS ?? 1500);
-const NOT_YET_ACTIVE_DELAY_MS = Number(
-  process.env.NOT_YET_ACTIVE_DELAY_MS ?? 3000
-);
 
-// when using "throw to retry", these are only labels (content doesn't matter)
+// retry markers (labels only)
 const RETRY_NOT_YET_ACTIVE = new Error('RETRY_NOT_YET_ACTIVE');
 const RETRY_NOT_FIRST = new Error('RETRY_NOT_FIRST');
 const RETRY_NO_STOCK = new Error('RETRY_NO_STOCK');
 
 const saleCacheKey = (saleId: string) => `fsmeta:${saleId}`;
 const invKey = (saleId: string) => `fsinv:${saleId}`;
+const lockKey = (saleId: string) => `fslock:${saleId}`;
+
+// Simple Redis mutex (varargs form for SET)
+async function withLock<T>(
+  redis: Redis,
+  key: string,
+  ttlMs: number,
+  fn: () => Promise<T>
+) {
+  const token = `${Date.now()}:${Math.random()}`;
+  const acquired = await redis.set(key, token, 'PX', ttlMs, 'NX');
+  if (acquired !== 'OK') return { ok: false, reason: 'lock_busy' as const };
+  try {
+    return await fn();
+  } finally {
+    const val = await redis.get(key);
+    if (val === token) await redis.del(key);
+  }
+}
 
 async function bootstrap() {
   await mongoose.connect(MONGODB_URI);
-  const redis = new IORedis(REDIS_URL);
+  const redis = new Redis(REDIS_URL);
 
-  // queue is used to schedule release_hold
   const queue = new Queue(QUEUE_NAME, {
     connection: { url: REDIS_URL },
     prefix: BULL_PREFIX,
   });
+
+  // Optional: event listener (not required for scheduling)
+  const queueEvents = new QueueEvents(QUEUE_NAME, {
+    connection: { url: REDIS_URL },
+    prefix: BULL_PREFIX,
+  });
+  await queueEvents.waitUntilReady();
 
   const worker = new Worker(
     QUEUE_NAME,
     async (job: Job) => {
       const { name } = job;
 
-      // -------------------------------
-      // 1️⃣ RESERVE JOB
-      // -------------------------------
+      // 1) RESERVE: grant hold if head-of-line, active sale, stock > 0
       if (name === 'reserve') {
         const {
           email: rawEmail,
@@ -52,20 +71,18 @@ async function bootstrap() {
         } = job.data as {
           email: string;
           flashSaleId: string;
-          holdTtlSec: number;
+          holdTtlSec?: number;
         };
         const email = rawEmail.trim().toLowerCase();
         const now = new Date();
         const qKey = zsetKey(flashSaleId);
 
-        // Short-circuit: if user already purchased once, never grant another hold.
         if (await redis.exists(consumedKey(flashSaleId, email))) {
           await redis.zrem(qKey, email);
-          // Do NOT retry; just finish (no hold to grant)
           return { ok: false, reason: 'already_consumed' as const };
         }
 
-        // ---- Load sale meta (short cache) ----
+        // short-cached sale meta
         let saleMeta = JSON.parse(
           (await redis.get(saleCacheKey(flashSaleId))) ?? 'null'
         );
@@ -96,15 +113,11 @@ async function bootstrap() {
               )
               .lean();
           }
-
-          saleMeta = doc;
-
-          if (!saleMeta) {
+          if (!doc) {
             await redis.zrem(qKey, email);
-            // Do NOT retry; the sale truly doesn't exist
             throw new Error('flash_sale_not_found');
           }
-
+          saleMeta = doc;
           await redis.set(
             saleCacheKey(flashSaleId),
             JSON.stringify(saleMeta),
@@ -118,99 +131,146 @@ async function bootstrap() {
         const isOnSchedule = saleMeta.status === FlashSaleStatus.OnSchedule;
         const isActiveWindow = isOnSchedule && startsAt <= now && now < endsAt;
 
-        // If sale ended/cancelled → cleanup and stop (no retries)
         if (!isOnSchedule || now >= endsAt) {
           await redis.zrem(qKey, email);
           throw new Error('sale_inactive_or_ended');
         }
+        if (!isActiveWindow) throw RETRY_NOT_YET_ACTIVE;
 
-        // Must be sale window → else retry later (backoff handles the delay)
-        if (!isActiveWindow) {
-          throw RETRY_NOT_YET_ACTIVE;
-        }
+        // serialize per sale
+        const lockRes = await withLock(
+          redis,
+          lockKey(flashSaleId),
+          5000,
+          async () => {
+            const rank = await redis.zrank(qKey, email);
+            if (rank !== 0) throw RETRY_NOT_FIRST;
 
-        // Must be head-of-line → else retry later
-        const rank = await redis.zrank(qKey, email);
-        const isFirst = rank === 0;
-        if (!isFirst) {
-          throw RETRY_NOT_FIRST;
-        }
+            const initInv = Number(saleMeta.startingQuantity ?? 0);
+            await redis.set(invKey(flashSaleId), String(initInv), 'NX');
 
-        // Ensure Redis inventory key exists (only once)
-        // Use SETNX to avoid clobbering under races
-        const initInv = saleMeta.startingQuantity ?? 0;
-        await redis.set(invKey(flashSaleId), String(initInv), 'NX');
+            const curStock = parseInt(
+              (await redis.get(invKey(flashSaleId))) ?? '0',
+              10
+            );
+            if (curStock <= 0) throw RETRY_NO_STOCK;
 
-        // Atomic stock decrement
-        const stockLeft = await redis.decr(invKey(flashSaleId));
-        if (stockLeft < 0) {
-          // Rollback and retry later (someone else got it)
-          await redis.incr(invKey(flashSaleId));
-          throw RETRY_NO_STOCK;
-        }
+            await redis.decr(invKey(flashSaleId));
 
-        // Grant hold + remove from visible queue (atomic)
-        const holdTime = Math.max(1, Number(holdTtlSec) || HOLD_TTL_SECONDS);
-        const multi = redis.multi();
-        multi.set(holdKey(flashSaleId, email), '1', 'EX', holdTime);
-        multi.zrem(qKey, email);
-        await multi.exec();
+            const holdTime = Math.max(
+              1,
+              Number(holdTtlSec) || HOLD_TTL_SECONDS
+            );
+            await redis
+              .multi()
+              .set(holdKey(flashSaleId, email), '1', 'EX', holdTime)
+              .zrem(qKey, email)
+              .exec();
 
-        // Schedule release_hold job after TTL (idempotent id)
-        await queue.add(
-          'release_hold',
-          { flashSaleId, email },
-          {
-            delay: holdTime * 1000,
-            jobId: `release:${flashSaleId}:${email}`,
-            removeOnComplete: true,
-            removeOnFail: true,
+            await queue.add(
+              'release_hold',
+              { flashSaleId, email },
+              {
+                delay: holdTime * 1000,
+                jobId: `release:${flashSaleId}:${email}`,
+                removeOnComplete: true,
+                removeOnFail: true,
+              }
+            );
+
+            return { ok: true as const, holdTime, stockLeft: curStock - 1 };
           }
         );
 
-        return { ok: true, holdTime, stockLeft };
+        if (
+          (lockRes as any)?.ok === false &&
+          (lockRes as any)?.reason === 'lock_busy'
+        ) {
+          throw RETRY_NOT_FIRST;
+        }
+        return lockRes;
       }
 
-      // -------------------------------
-      // 2️⃣ RELEASE_HOLD JOB
-      // -------------------------------
+      // 2) RELEASE_HOLD: restore stock → assign next → grant next hold → schedule next release
       if (name === 'release_hold') {
         const { flashSaleId, email } = job.data as {
           flashSaleId: string;
           email: string;
         };
 
-        // Exec may return null per ioredis types — handle defensively
-        const execRes = await redis
-          .multi()
-          .exists(holdKey(flashSaleId, email)) // -> 0/1
-          .exists(consumedKey(flashSaleId, email)) // -> 0/1
-          .exec();
+        const lockRes = await withLock(
+          redis,
+          lockKey(flashSaleId),
+          5000,
+          async () => {
+            const hk = holdKey(flashSaleId, email);
+            const ck = consumedKey(flashSaleId, email);
+            const inv = invKey(flashSaleId);
+            const qk = zsetKey(flashSaleId);
 
-        if (!execRes) {
-          console.warn('[release_hold] MULTI.exec() returned null; skipping');
-          return { ok: false, reason: 'exec_null' as const };
+            const execRes = await redis.multi().exists(hk).exists(ck).exec();
+            if (!execRes)
+              return { ok: false as const, status: 'exec_null' as const };
+
+            const holdExists = Number(execRes[0]?.[1]) === 1;
+            const consumedExists = Number(execRes[1]?.[1]) === 1;
+
+            if (consumedExists)
+              return { ok: true as const, status: 'consumed' as const };
+            if (holdExists)
+              return { ok: true as const, status: 'active' as const };
+
+            // expired & not consumed → restore stock
+            await redis.incr(inv);
+
+            // pop next (ioredis v5 returns [member, score] or [])
+            const popped = await (redis as any).zpopmin(qk, 1);
+            if (!popped || popped.length < 2) {
+              return { ok: true as const, status: 'restored' as const };
+            }
+
+            const nextEmail = String(popped[0]);
+            const stockNow = parseInt((await redis.get(inv)) ?? '0', 10);
+            if (stockNow > 0) {
+              await redis.decr(inv);
+              const nextHoldTtl = HOLD_TTL_SECONDS;
+
+              await redis.set(
+                holdKey(flashSaleId, nextEmail),
+                '1',
+                'EX',
+                nextHoldTtl
+              );
+
+              await queue.add(
+                'release_hold',
+                { flashSaleId, email: nextEmail },
+                {
+                  delay: nextHoldTtl * 1000,
+                  jobId: `release:${flashSaleId}:${nextEmail}`,
+                  removeOnComplete: true,
+                  removeOnFail: true,
+                }
+              );
+
+              return {
+                ok: true as const,
+                status: 'assigned' as const,
+                nextEmail,
+              };
+            }
+
+            return { ok: true as const, status: 'restored' as const };
+          }
+        );
+
+        if (
+          (lockRes as any)?.ok === false &&
+          (lockRes as any)?.reason === 'lock_busy'
+        ) {
+          return { ok: false, status: 'lock_busy' as const };
         }
-
-        const isActive = Number(execRes[0]?.[1]) === 1;
-        const isConsumed = Number(execRes[1]?.[1]) === 1;
-
-        if (!isActive && !isConsumed) {
-          // Hold expired and not purchased → return stock to Redis
-          const newStock = await redis.incr(invKey(flashSaleId));
-          console.log(
-            `[release_hold] Restored 1 unit to ${flashSaleId} (now ${newStock})`
-          );
-        } else if (isConsumed) {
-          console.log(
-            `[release_hold] Skipping restore: purchase consumed for ${email}`
-          );
-        } else {
-          console.log(
-            `[release_hold] Hold still active for ${email}, skipping restore`
-          );
-        }
-        return { ok: true };
+        return lockRes;
       }
 
       return;
@@ -219,8 +279,7 @@ async function bootstrap() {
       connection: { url: REDIS_URL },
       prefix: BULL_PREFIX,
       concurrency: 8,
-      // Make sure the lock outlives your processing and backoff jitter
-      lockDuration: 30000, // 30s is plenty for this short handler
+      lockDuration: 30000,
     }
   );
 
@@ -241,8 +300,14 @@ async function bootstrap() {
     console.error('[worker fail]', j?.id, j?.name, e?.message)
   );
 
+  // Optional: observe events (helps debugging delayed jobs)
+  queueEvents.on('failed', ({ jobId, failedReason }) =>
+    console.error('[events failed]', jobId, failedReason)
+  );
+
   const shutdown = async () => {
     await worker.close();
+    await queueEvents.close();
     await queue.close();
     await redis.quit();
     await mongoose.disconnect();
