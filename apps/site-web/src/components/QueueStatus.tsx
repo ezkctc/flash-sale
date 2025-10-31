@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Card, Typography, Space, Tag, Button, Spin } from 'antd';
 import { ClockCircleOutlined, CheckCircleOutlined, ReloadOutlined } from '@ant-design/icons';
 import { toast } from 'react-toastify';
@@ -22,18 +22,26 @@ export function QueueStatus({ userEmail, flashSaleId, flashSale, initialPosition
   const [position, setPosition] = useState<QueuePosition | null>(initialPosition);
   const [loading, setLoading] = useState(false);
   const [confirming, setConfirming] = useState(false);
+  const [holdCountdown, setHoldCountdown] = useState(0);
 
-  const fetchPosition = async () => {
+  const fetchPosition = useCallback(async () => {
     setLoading(true);
     try {
       const data = await queueService.getPosition(userEmail, flashSaleId);
       setPosition(data);
+      
+      // Update hold countdown if user has active hold
+      if (data.hasActiveHold && data.holdTtlSec > 0) {
+        setHoldCountdown(data.holdTtlSec);
+      } else {
+        setHoldCountdown(0);
+      }
     } catch (error: any) {
       toast.error(error.message || 'Failed to fetch queue position');
     } finally {
       setLoading(false);
     }
-  };
+  }, [userEmail, flashSaleId]);
 
   const handleConfirmPayment = async () => {
     setConfirming(true);
@@ -59,7 +67,25 @@ export function QueueStatus({ userEmail, flashSaleId, flashSale, initialPosition
     fetchPosition();
     const interval = setInterval(fetchPosition, 5000); // Poll every 5 seconds
     return () => clearInterval(interval);
-  }, [userEmail, flashSaleId]);
+  }, [fetchPosition]);
+
+  // Hold countdown timer
+  useEffect(() => {
+    if (holdCountdown <= 0) return;
+
+    const timer = setInterval(() => {
+      setHoldCountdown(prev => {
+        if (prev <= 1) {
+          // Hold expired, refresh position
+          fetchPosition();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [holdCountdown, fetchPosition]);
 
   if (loading && !position) {
     return (
@@ -76,9 +102,9 @@ export function QueueStatus({ userEmail, flashSaleId, flashSale, initialPosition
     return null;
   }
 
-  const holdMinutes = Math.floor(position.holdTtlSec / 60);
-  const holdSeconds = position.holdTtlSec % 60;
-  const holdTimeFormatted = timeUtil.formatDuration(position.holdTtlSec);
+  // Use live countdown if available, otherwise use position data
+  const currentHoldTime = holdCountdown > 0 ? holdCountdown : position.holdTtlSec;
+  const holdTimeFormatted = timeUtil.formatDuration(currentHoldTime);
 
   // Check if user can purchase based on position vs remaining inventory
   const canPurchase = position.position && 
@@ -108,15 +134,22 @@ export function QueueStatus({ userEmail, flashSaleId, flashSale, initialPosition
                 <Title level={3} style={{ color: 'white', margin: 0 }}>
                   Reservation Confirmed!
                 </Title>
-                <Text style={{ color: 'rgba(255,255,255,0.9)', fontSize: 16 }}>
-                  You have {holdTimeFormatted} to complete your purchase
-                </Text>
+                {currentHoldTime > 0 ? (
+                  <Text style={{ color: 'rgba(255,255,255,0.9)', fontSize: 16 }}>
+                    You have {holdTimeFormatted} to complete your purchase
+                  </Text>
+                ) : (
+                  <Text style={{ color: 'rgba(255,255,255,0.9)', fontSize: 16 }}>
+                    Your reservation has expired
+                  </Text>
+                )}
               </div>
               <Button
                 type="primary"
                 size="large"
                 onClick={handleConfirmPayment}
                 loading={confirming}
+                disabled={currentHoldTime <= 0}
                 style={{
                   backgroundColor: 'rgba(255,255,255,0.2)',
                   borderColor: 'rgba(255,255,255,0.3)',
@@ -124,7 +157,12 @@ export function QueueStatus({ userEmail, flashSaleId, flashSale, initialPosition
                   fontSize: 16,
                 }}
               >
-                {confirming ? 'Processing Payment...' : 'Confirm Payment ($1.00)'}
+                {currentHoldTime <= 0 
+                  ? 'Reservation Expired' 
+                  : confirming 
+                    ? 'Processing Payment...' 
+                    : 'Confirm Payment ($1.00)'
+                }
               </Button>
             </>
           ) : canPurchase ? (
@@ -158,11 +196,11 @@ export function QueueStatus({ userEmail, flashSaleId, flashSale, initialPosition
               <ClockCircleOutlined style={{ fontSize: 48 }} />
               <div>
                 <Title level={3} style={{ color: 'white', margin: 0 }}>
-                  Waiting in Queue
+                  {position.position ? 'Waiting in Queue' : 'Processing Request'}
                 </Title>
                 {position.position ? (
                   <Text style={{ color: 'rgba(255,255,255,0.9)', fontSize: 16 }}>
-                    Position #{position.position} of {position.size} - Not enough inventory yet
+                    Position #{position.position} of {position.size} - Waiting for your turn
                   </Text>
                 ) : (
                   <Text style={{ color: 'rgba(255,255,255,0.9)', fontSize: 16 }}>

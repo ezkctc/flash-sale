@@ -27,6 +27,9 @@ export function FlashSalePage() {
   const [queueStatus, setQueueStatus] = useState<QueuePosition | null>(null); // Check for saved email on mount
   const [countdownCompleted, setCountdownCompleted] = useState(false);
 
+  // Force re-render when countdown completes
+  const [forceUpdate, setForceUpdate] = useState(0);
+
   useEffect(() => {
     const savedEmail = storageUtil.getUserEmail();
     if (savedEmail) {
@@ -100,6 +103,7 @@ export function FlashSalePage() {
 
   const handleCountdownComplete = () => {
     setCountdownCompleted(true);
+    setForceUpdate(prev => prev + 1); // Force re-render
     // Refresh flash sale data to get updated status
     fetchFlashSale();
     toast.success('🎉 Flash sale is now live!');
@@ -193,6 +197,7 @@ export function FlashSalePage() {
                   queueStatus={queueStatus}
                   onBuy={handleBuyClick}
                   countdownCompleted={countdownCompleted}
+                  key={`${flashSale.item?._id}-${countdownCompleted}-${forceUpdate}`}
                 />
                 {/* Show queue status if user is in queue */}
                 {queueStatus && queueStatus.size > 0 && flashSale.item && (
