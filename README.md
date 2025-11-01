@@ -70,7 +70,7 @@ The core challenge addressed by this architecture is the **Flash Crowd problem**
    - [Installation](#92-installation)
    - [Running Infrastructure](#93-running-infrastructure)
    - [Services and Local URLs](#94-services-and-local-urls)
-   - [First Admin User](#95-first-admin-user)
+   - [Creating and Testing the First Admin User](#95-creating-and-testing-the-first-admin-user)
    - [Complete Environment Variables Reference](#96-complete-environment-variables-reference)
 
 10. [Testing Strategy](#10-testing-strategy)
@@ -640,16 +640,55 @@ Then, start specific app components as needed (e.g., `npm run dev:api`, `npm run
 | **Prometheus**                       | Docker        | [http://localhost:9090](http://localhost:9090)                                     |
 | **Grafana**                          | Docker        | [http://localhost:3000](http://localhost:3000)                                     |
 
-### 9.5 First Admin User
+### 9.5 Creating and Testing the First Admin User
+
+You can create your first admin user either through the **Admin Web UI** (recommended) or directly via the **API**.
+
+---
+
+#### Option 1: Create via Admin Web (Recommended)
+
+1. **Open the Admin Panel Login Page:**  
+   [http://localhost:4200/login](http://localhost:4200/login)
+
+2. **Sign Up or Log In:**
+
+   - If this is your first time, click **Sign Up** and create an admin account.
+   - Otherwise, log in with your existing credentials.
+
+3. **Access the Flash Sales Dashboard:**  
+   After logging in, go to:  
+   [http://localhost:4200/dashboard/flash-sales](http://localhost:4200/dashboard/flash-sales)
+
+   - Use this page to **create and manage flash sales**.
+   - Ensure your API and worker services are running before creating a sale.
+
+4. **Test from the Customer Site:**  
+   Visit the public-facing site to simulate a buyer experience:  
+   [http://localhost:4201/](http://localhost:4201/)
+
+   - Browse active sales, attempt purchases, and confirm payment flows.
+
+---
+
+#### Option 2: Create via API
 
 ```bash
 POST /api/auth/sign-up/email
 {
-  "name":"admin",
-  "email":"admin@admin.com",
-  "password":"admin1234"
+  "name": "admin",
+  "email": "admin@admin.com",
+  "password": "admin1234"
 }
 ```
+
+---
+
+#### ✅ Summary
+
+- Use the **Admin Web** for quick setup and sale creation.
+- Ensure backend (`API` + `Worker`) services are running before testing.
+- You can then test the full flash sale workflow end-to-end between **Admin Web** and **Customer Site**.
 
 ### 9.6 Complete Environment Variables Reference
 
