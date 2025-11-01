@@ -117,6 +117,12 @@
         "options": {
           "script": "tools/k6/api-soak.js"
         }
+      },
+      "k6-flash-sale": {
+        "executor": "@flash-sale/tools:k6-run",
+        "options": {
+          "script": "tools/k6/flash-sale-stress.js"
+        }
       }
     }
   },

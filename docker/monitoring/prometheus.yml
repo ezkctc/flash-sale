@@ -18,7 +18,7 @@ scrape_configs:
   # Job to scrape the Fastify API (api container)
   - job_name: 'flash-sale-api'
     static_configs:
-      - targets: ['api:4300']
+      - targets: ['api:4000']
     metrics_path: /metrics
 
   # Job to scrape the BullMQ Worker (worker container)

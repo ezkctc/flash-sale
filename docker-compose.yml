@@ -48,7 +48,7 @@ services:
       dockerfile: apps/api/Dockerfile
     container_name: flash-sale-api
     ports:
-      - '4300:4300'
+      - '4000:4000'
     env_file:
       - .env
     environment:

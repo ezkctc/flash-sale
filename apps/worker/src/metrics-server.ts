@@ -25,7 +25,8 @@ export async function startMetricsServer() {
   collectDefaultMetrics({ prefix: 'flash_sale_worker_' });
 
   // Register the fastify-metrics plugin for general server metrics
-  await fastify.register(metrics);
+  // Use a non-conflicting endpoint so we can expose our own combined '/metrics'
+  await fastify.register(metrics, { endpoint: '/node-metrics' });
 
   // --- BullMQ Metrics Endpoint ---
   // This route is responsible for fetching the BullMQ metrics

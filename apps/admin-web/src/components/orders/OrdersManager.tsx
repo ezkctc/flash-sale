@@ -107,6 +107,15 @@ export function OrdersManager() {
           <span className="font-mono text-xs">{id.toString() || 'N/A'}</span>
         ),
       },
+      // {
+      //   title: 'Flash Sale',
+      //   dataIndex: 'flashSaleName',
+      //   key: 'flashSaleName',
+      //   width: 120,
+      //   render: (name: string) => (
+      //     <span className="font-mono text-xs">{name || 'N/A'}</span>
+      //   ),
+      // },
       {
         title: 'Status',
         dataIndex: 'paymentStatus',

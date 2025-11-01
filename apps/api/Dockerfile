@@ -20,14 +20,14 @@ RUN npx nx prune --project=@flash-sale/api
 FROM node:20-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
-ENV PORT=4300
+ENV PORT=4000
 
-# Install only pruned, production dependencies
-COPY --from=build /app/pruned/package*.json ./
+# Install production dependencies using root manifest
+COPY --from=deps /app/package*.json ./
 RUN npm ci --omit=dev
 
-# Copy the built API dist
-COPY --from=build /app/dist/apps/api ./dist/apps/api
+# Copy the built API dist (Nx outputs to apps/api/dist)
+COPY --from=build /app/apps/api/dist ./dist/apps/api
 
 # Run the Fastify app
 CMD ["node", "dist/apps/api/main.js"]

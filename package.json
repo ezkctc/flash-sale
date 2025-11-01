@@ -28,6 +28,7 @@
     "k6:api:smoke": "nx k6-test @flash-sale/api",
     "k6:api:stress": "nx k6-stress @flash-sale/api",
     "k6:api:soak": "nx k6-soak @flash-sale/api",
+    "k6:flash": "nx k6-flash-sale @flash-sale/api",
     "k6:worker:smoke": "nx k6-test @flash-sale/worker",
     "k6:worker:stress": "nx k6-stress @flash-sale/worker",
     "k6:worker:soak": "nx k6-soak @flash-sale/worker",

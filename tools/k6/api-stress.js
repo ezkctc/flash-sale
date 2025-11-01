@@ -17,7 +17,7 @@ export const options = {
   },
 };
 
-const BASE = __ENV.API_BASE || 'http://api:4300';
+const BASE = __ENV.API_BASE || 'http://api:4000';
 
 export default function () {
   const res = http.get(`${BASE}/health`);
@@ -26,4 +26,3 @@ export default function () {
   });
   sleep(0.5);
 }
-
