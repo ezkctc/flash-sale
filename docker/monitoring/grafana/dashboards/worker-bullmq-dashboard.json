@@ -1,0 +1,96 @@
+{
+  "id": null,
+  "uid": "flash-worker",
+  "title": "Flash Sale Worker & BullMQ",
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "10s",
+  "tags": ["flash-sale", "worker", "bullmq"],
+  "panels": [
+    {
+      "type": "stat",
+      "title": "Jobs Waiting",
+      "gridPos": {"x": 0, "y": 0, "w": 6, "h": 4},
+      "targets": [
+        {"expr": "sum(bullmq_queue_waiting_jobs)", "legendFormat": "waiting"}
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Jobs Active",
+      "gridPos": {"x": 6, "y": 0, "w": 6, "h": 4},
+      "targets": [
+        {"expr": "sum(bullmq_queue_active_jobs)", "legendFormat": "active"}
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Jobs Failed (total)",
+      "gridPos": {"x": 12, "y": 0, "w": 6, "h": 4},
+      "targets": [
+        {"expr": "sum(rate(bullmq_queue_failed_jobs_total[5m]))", "legendFormat": "fail/s"}
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Jobs Completed (total)",
+      "gridPos": {"x": 18, "y": 0, "w": 6, "h": 4},
+      "targets": [
+        {"expr": "sum(rate(bullmq_queue_completed_jobs_total[5m]))", "legendFormat": "done/s"}
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Queue Sizes by State",
+      "gridPos": {"x": 0, "y": 4, "w": 12, "h": 8},
+      "targets": [
+        {"expr": "sum(bullmq_queue_waiting_jobs) by (queue)", "legendFormat": "waiting {{queue}}"},
+        {"expr": "sum(bullmq_queue_active_jobs) by (queue)", "legendFormat": "active {{queue}}"},
+        {"expr": "sum(bullmq_queue_delayed_jobs) by (queue)", "legendFormat": "delayed {{queue}}"}
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Throughput (completed/failed per second)",
+      "gridPos": {"x": 12, "y": 4, "w": 12, "h": 8},
+      "targets": [
+        {"expr": "sum(rate(bullmq_queue_completed_jobs_total[1m])) by (queue)", "legendFormat": "completed {{queue}}"},
+        {"expr": "sum(rate(bullmq_queue_failed_jobs_total[1m])) by (queue)", "legendFormat": "failed {{queue}}"}
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Worker Memory RSS",
+      "gridPos": {"x": 0, "y": 12, "w": 12, "h": 8},
+      "targets": [
+        {"expr": "flash_sale_worker_process_resident_memory_bytes", "legendFormat": "rss"}
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Worker CPU (user/system)",
+      "gridPos": {"x": 12, "y": 12, "w": 12, "h": 8},
+      "targets": [
+        {"expr": "rate(flash_sale_worker_process_cpu_user_seconds_total[1m])", "legendFormat": "user"},
+        {"expr": "rate(flash_sale_worker_process_cpu_system_seconds_total[1m])", "legendFormat": "system"}
+      ]
+    }
+  ],
+  "templating": {
+    "list": [
+      {
+        "type": "query",
+        "name": "queue",
+        "label": "Queue",
+        "datasource": "Prometheus",
+        "refresh": 1,
+        "query": "label_values(bullmq_queue_waiting_jobs, queue)",
+        "includeAll": true,
+        "multi": true,
+        "sort": 1
+      }
+    ]
+  },
+  "time": {"from": "now-6h", "to": "now"}
+}

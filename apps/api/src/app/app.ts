@@ -8,8 +8,22 @@ import jwt from '@fastify/jwt';
 import cookie from '@fastify/cookie';
 import swagger from '@fastify/swagger';
 import swaggerUi from '@fastify/swagger-ui';
+
+import { createBullBoard } from '@bull-board/api';
+import { BullMQAdapter } from '@bull-board/api/bullMQAdapter';
+import { FastifyAdapter } from '@bull-board/fastify';
+import { Queue } from 'bullmq';
+import IORedis from 'ioredis';
+
+import metrics from 'fastify-metrics';
+import { collectDefaultMetrics } from 'prom-client';
+
 /* eslint-disable-next-line */
 export interface AppOptions {}
+
+const REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
+const QUEUE_NAME = process.env.QUEUE_NAME || 'sale-processing-queue';
+const DASHBOARD_ROUTE = '/bull-mq-dashboard'; // Set the dashboard access path
 
 export async function app(fastify: FastifyInstance, opts: AppOptions) {
   // Place here your custom code!
@@ -28,6 +42,41 @@ export async function app(fastify: FastifyInstance, opts: AppOptions) {
     dir: path.join(__dirname, '..', 'plugins'),
     options: { ...opts },
   });
+
+  ///BULLBOARD
+
+  // Parse REDIS_URL to get connection options
+  const redisConnection = new IORedis(REDIS_URL, {
+    maxRetriesPerRequest: null,
+  });
+
+  // 1. Initialize the Queue instance for the dashboard (needs connection options)
+  const flashSaleQueue = new Queue(QUEUE_NAME, {
+    connection: redisConnection,
+  });
+
+  // 2. Create the Fastify adapter
+  const serverAdapter = new FastifyAdapter();
+  serverAdapter.setBasePath(DASHBOARD_ROUTE); // Set the base path
+
+  // 3. Create the Bull Board instance and register the queues
+  createBullBoard({
+    queues: [new BullMQAdapter(flashSaleQueue)],
+    serverAdapter,
+  });
+
+  // 4. Register the adapter as a Fastify plugin
+  await fastify.register(serverAdapter.registerPlugin(), {
+    prefix: DASHBOARD_ROUTE,
+  });
+
+  /// METRICS
+  collectDefaultMetrics({ prefix: 'flash_sale_api_' });
+  await fastify.register(metrics, {
+    endpoint: '/metrics',
+  });
+
+  ///SWAGGER
 
   fastify.register(swagger, {
     openapi: {

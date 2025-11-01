@@ -1,0 +1,4 @@
+# Deprecated: moved to provisioning/dashboards/dashboards.yml
+# Keeping file to avoid breaking references; Grafana ignores this if not mounted
+apiVersion: 1
+providers: []

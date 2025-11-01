@@ -4,6 +4,7 @@ import { Redis } from 'ioredis';
 import mongoose, { Types } from 'mongoose';
 import { flashSaleMongoModel, FlashSaleStatus } from '@flash-sale/shared-types';
 import { zsetKey, holdKey, consumedKey } from '@flash-sale/shared-utils';
+import { startMetricsServer } from './metrics-server';
 
 export const REDIS_URL =
   process.env.REDIS_URL ?? 'redis://:redispass@localhost:6379';
@@ -279,6 +280,8 @@ export async function startWorker() {
       lockDuration: 30_000,
     }
   );
+
+  await startMetricsServer();
 
   worker.on('active', (j) =>
     console.log(

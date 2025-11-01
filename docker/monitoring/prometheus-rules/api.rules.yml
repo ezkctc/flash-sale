@@ -1,0 +1,58 @@
+groups:
+  - name: flash-sale-api
+    interval: 30s
+    rules:
+      # Overall request rate (req/s)
+      - record: flash_api:requests_per_second
+        expr: sum(rate(http_request_duration_seconds_count{job="flash-sale-api"}[1m]))
+
+      # Error rate (ratio)
+      - record: flash_api:error_rate
+        expr: |
+          sum(rate(http_request_duration_seconds_count{job="flash-sale-api",status_code=~"5.."}[5m]))
+          /
+          sum(rate(http_request_duration_seconds_count{job="flash-sale-api"}[5m]))
+
+      # P95 latency (seconds)
+      - record: flash_api:latency:p95
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum(rate(http_request_duration_seconds_bucket{job="flash-sale-api"}[5m])) by (le)
+          )
+
+      # P99 latency (seconds)
+      - record: flash_api:latency:p99
+        expr: |
+          histogram_quantile(
+            0.99,
+            sum(rate(http_request_duration_seconds_bucket{job="flash-sale-api"}[5m])) by (le)
+          )
+
+      # Requests per second by status code
+      - record: flash_api:requests_per_second:by_code
+        expr: sum(rate(http_request_duration_seconds_count{job="flash-sale-api"}[1m])) by (status_code)
+
+      # Requests per second by route/method
+      - record: flash_api:route:requests_per_second
+        labels: { }
+        expr: |
+          sum(rate(http_request_duration_seconds_count{job="flash-sale-api"}[1m])) by (route, method)
+
+      # Route-level P95 latency (seconds)
+      - record: flash_api:route:latency:p95
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum(rate(http_request_duration_seconds_bucket{job="flash-sale-api"}[5m])) by (le, route, method)
+          )
+
+      # Node process metrics (already pre-prefixed in code)
+      - record: flash_api:process_rss_bytes
+        expr: flash_sale_api_process_resident_memory_bytes
+
+      - record: flash_api:cpu_user_seconds_per_second
+        expr: rate(flash_sale_api_process_cpu_user_seconds_total[1m])
+
+      - record: flash_api:cpu_system_seconds_per_second
+        expr: rate(flash_sale_api_process_cpu_system_seconds_total[1m])
