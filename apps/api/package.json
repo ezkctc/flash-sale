@@ -2,6 +2,9 @@
   "name": "@flash-sale/api",
   "version": "0.0.1",
   "private": true,
+   "scripts": {
+    "test": "vitest --config apps/api/vitest.config.ts"
+  },
   "nx": {
     "targets": {
       "build": {
