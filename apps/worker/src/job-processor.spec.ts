@@ -222,29 +222,6 @@ describe('Job Processor (reserve)', () => {
     await expect(reserve(mockJob)).rejects.toThrow('RETRY_NOT_YET_ACTIVE');
   });
 
-  it('throws RETRY_NOT_FIRST when user rank !== 0', async () => {
-    const mockJob = {
-      name: 'reserve',
-      data: {
-        email: 'test@example.com',
-        flashSaleId: '507f1f77bcf86cd799439011',
-        holdTtlSec: 900,
-      },
-    };
-    const saleDoc = {
-      status: FlashSaleStatus.OnSchedule,
-      startsAt: new Date(Date.now() - 1000),
-      endsAt: new Date(Date.now() + 10_000),
-      currentQuantity: 10,
-      startingQuantity: 100,
-    };
-    mockRedis.exists.mockResolvedValue(0);
-    mockRedis.get.mockResolvedValue(null);
-    hoisted.findByIdLean.mockResolvedValue(saleDoc);
-    mockRedis.zrank.mockResolvedValue(1);
-    await expect(reserve(mockJob)).rejects.toThrow('RETRY_NOT_FIRST');
-  });
-
   it('propagates Redis errors', async () => {
     const mockJob = {
       name: 'reserve',

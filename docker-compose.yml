@@ -48,7 +48,7 @@ services:
       dockerfile: apps/api/Dockerfile
     container_name: flash-sale-api
     ports:
-      - '4300:4300'
+      - '4000:4000'
     env_file:
       - .env
     environment:
@@ -68,6 +68,8 @@ services:
       context: .
       dockerfile: apps/worker/Dockerfile
     container_name: flash-sale-worker
+    expose:
+      - '4001'
     env_file:
       - .env
     environment:
@@ -110,6 +112,49 @@ services:
         condition: service_started
     restart: unless-stopped
 
+  # --- Prometheus Service ---
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: flash-sale-prometheus
+    restart: unless-stopped
+    volumes:
+      # Map the configuration file we created
+      - ./docker/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      # Recording/alerting rules
+      - ./docker/monitoring/prometheus-rules:/etc/prometheus/rules
+      # Volume for persistent storage of metrics data
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.retention.time=7d' # Keep data for 7 days
+    ports:
+      - '9090:9090' # Prometheus Web UI
+    # depends_on:
+    #   api:
+    #     condition: service_started
+    #   worker:
+    #     condition: service_started
+    # Important: Prometheus needs to be able to resolve and reach all services
+
+  # --- Grafana Service ---
+  grafana:
+    image: grafana/grafana:latest
+    container_name: flash-sale-grafana
+    restart: unless-stopped
+    # Default user: admin, password: admin
+    ports:
+      - '3000:3000' # Grafana Web UI
+    volumes:
+      # Volume for persistent storage of dashboards
+      - grafana_data:/var/lib/grafana
+      # Provision Grafana with Prometheus datasource and dashboards
+      - ./docker/monitoring/grafana/provisioning:/etc/grafana/provisioning
+      - ./docker/monitoring/grafana/dashboards:/var/lib/grafana/dashboards
+    depends_on:
+      - prometheus
+
 volumes:
   redis_data:
   mongo_data:
+  prometheus_data:
+  grafana_data:

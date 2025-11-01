@@ -1,0 +1,38 @@
+groups:
+  - name: flash-sale-worker
+    interval: 30s
+    rules:
+      # Queue sizes (gauges)
+      - record: flash_worker:queue:waiting
+        expr: sum(bullmq_queue_waiting_jobs) by (queue)
+
+      - record: flash_worker:queue:active
+        expr: sum(bullmq_queue_active_jobs) by (queue)
+
+      - record: flash_worker:queue:delayed
+        expr: sum(bullmq_queue_delayed_jobs) by (queue)
+
+      # Throughput (jobs/s)
+      - record: flash_worker:queue:completed_per_second
+        expr: sum(rate(bullmq_queue_completed_jobs_total[1m])) by (queue)
+
+      - record: flash_worker:queue:failed_per_second
+        expr: sum(rate(bullmq_queue_failed_jobs_total[1m])) by (queue)
+
+      # Aggregates across all queues
+      - record: flash_worker:throughput_completed_per_second
+        expr: sum(rate(bullmq_queue_completed_jobs_total[1m]))
+
+      - record: flash_worker:throughput_failed_per_second
+        expr: sum(rate(bullmq_queue_failed_jobs_total[1m]))
+
+      # Node process metrics (prefixed in metrics-server.ts)
+      - record: flash_worker:process_rss_bytes
+        expr: flash_sale_worker_process_resident_memory_bytes
+
+      - record: flash_worker:cpu_user_seconds_per_second
+        expr: rate(flash_sale_worker_process_cpu_user_seconds_total[1m])
+
+      - record: flash_worker:cpu_system_seconds_per_second
+        expr: rate(flash_sale_worker_process_cpu_system_seconds_total[1m])
+

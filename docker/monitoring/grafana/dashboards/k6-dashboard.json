@@ -1,0 +1,75 @@
+{
+  "id": null,
+  "uid": "k6-metrics",
+  "title": "k6 Load Test",
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "5s",
+  "tags": ["k6", "loadtest"],
+  "panels": [
+    {
+      "type": "stat",
+      "title": "Requests/s",
+      "gridPos": {"x": 0, "y": 0, "w": 6, "h": 4},
+      "targets": [{ "expr": "sum(rate(k6_http_reqs[30s]))" }]
+    },
+    {
+      "type": "stat",
+      "title": "Error Rate %",
+      "gridPos": {"x": 6, "y": 0, "w": 6, "h": 4},
+      "targets": [
+        { "expr": "(sum(rate(k6_http_req_failed[1m])) / sum(rate(k6_http_reqs[1m]))) * 100" }
+      ],
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "colorMode": "value"}
+    },
+    {
+      "type": "gauge",
+      "title": "Latency P95/P99 (ms)",
+      "gridPos": {"x": 12, "y": 0, "w": 12, "h": 4},
+      "targets": [
+        { "expr": "histogram_quantile(0.95, sum(rate(k6_http_req_duration_bucket[1m])) by (le)) * 1000", "legendFormat": "p95" },
+        { "expr": "histogram_quantile(0.99, sum(rate(k6_http_req_duration_bucket[1m])) by (le)) * 1000", "legendFormat": "p99" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Response Time Distribution",
+      "gridPos": {"x": 0, "y": 4, "w": 12, "h": 8},
+      "targets": [
+        { "expr": "sum(rate(k6_http_req_duration_bucket[30s])) by (le)", "legendFormat": "le {{le}}" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "VUs & Iterations",
+      "gridPos": {"x": 12, "y": 4, "w": 12, "h": 8},
+      "targets": [
+        { "expr": "sum(k6_vus)", "legendFormat": "vus" },
+        { "expr": "sum(rate(k6_iterations[30s]))", "legendFormat": "iterations/s" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "HTTP Codes",
+      "gridPos": {"x": 0, "y": 12, "w": 12, "h": 8},
+      "targets": [
+        { "expr": "sum(rate(k6_http_reqs{status=~\"2..\"}[30s]))", "legendFormat": "2xx" },
+        { "expr": "sum(rate(k6_http_reqs{status=~\"4..\"}[30s]))", "legendFormat": "4xx" },
+        { "expr": "sum(rate(k6_http_reqs{status=~\"5..\"}[30s]))", "legendFormat": "5xx" }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Data In/Out (KB/s)",
+      "gridPos": {"x": 12, "y": 12, "w": 12, "h": 8},
+      "targets": [
+        { "expr": "sum(rate(k6_data_sent[30s]))/1024", "legendFormat": "sent" },
+        { "expr": "sum(rate(k6_data_received[30s]))/1024", "legendFormat": "recv" }
+      ]
+    }
+  ],
+  "templating": { "list": []},
+  "time": {"from": "now-1h", "to": "now"}
+}
+

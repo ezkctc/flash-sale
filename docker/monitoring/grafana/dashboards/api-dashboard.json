@@ -1,0 +1,115 @@
+{
+  "id": null,
+  "uid": "flash-api",
+  "title": "Flash Sale API",
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "10s",
+  "tags": ["flash-sale", "api"],
+  "panels": [
+    {
+      "type": "stat",
+      "title": "Req/s",
+      "gridPos": {"x": 0, "y": 0, "w": 6, "h": 4},
+      "targets": [
+        {
+          "expr": "sum(rate(http_request_duration_seconds_count{job=\"flash-sale-api\"}[1m]))",
+          "legendFormat": "req/s"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "5xx Error Rate",
+      "gridPos": {"x": 6, "y": 0, "w": 6, "h": 4},
+      "targets": [
+        {
+          "expr": "(sum(rate(http_request_duration_seconds_count{job=\"flash-sale-api\",status_code=~\"5..\"}[5m])) / sum(rate(http_request_duration_seconds_count{job=\"flash-sale-api\"}[5m]))) * 100",
+          "legendFormat": "errors %"
+        }
+      ],
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"]}, "colorMode": "value"}
+    },
+    {
+      "type": "gauge",
+      "title": "Latency (P95/P99, ms)",
+      "gridPos": {"x": 12, "y": 0, "w": 12, "h": 4},
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{job=\"flash-sale-api\"}[5m])) by (le)) * 1000",
+          "legendFormat": "p95"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket{job=\"flash-sale-api\"}[5m])) by (le)) * 1000",
+          "legendFormat": "p99"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Requests by Status Code",
+      "gridPos": {"x": 0, "y": 4, "w": 12, "h": 8},
+      "targets": [
+        {
+          "expr": "sum(rate(http_request_duration_seconds_count{job=\"flash-sale-api\"}[1m])) by (status_code)",
+          "legendFormat": "{{status_code}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Memory RSS (API)",
+      "gridPos": {"x": 12, "y": 4, "w": 12, "h": 8},
+      "targets": [
+        {
+          "expr": "flash_sale_api_process_resident_memory_bytes",
+          "legendFormat": "rss"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "CPU User Seconds",
+      "gridPos": {"x": 0, "y": 12, "w": 12, "h": 8},
+      "targets": [
+        {
+          "expr": "rate(flash_sale_api_process_cpu_user_seconds_total[1m])",
+          "legendFormat": "user"
+        },
+        {
+          "expr": "rate(flash_sale_api_process_cpu_system_seconds_total[1m])",
+          "legendFormat": "system"
+        }
+      ]
+    },
+    {
+      "type": "table",
+      "title": "Top Routes by Latency (p95)",
+      "gridPos": {"x": 12, "y": 12, "w": 12, "h": 8},
+      "targets": [
+        {
+          "expr": "topk(10, histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{job=\"flash-sale-api\"}[5m])) by (le,route))) * 1000",
+          "legendFormat": "{{route}}"
+        }
+      ],
+      "options": {"showHeader": true}
+    }
+  ],
+  "templating": {
+    "list": [
+      {
+        "type": "query",
+        "name": "route",
+        "label": "Route",
+        "datasource": "Prometheus",
+        "refresh": 1,
+        "query": "label_values(http_request_duration_seconds_count{job=\"flash-sale-api\"}, route)",
+        "includeAll": true,
+        "multi": true,
+        "sort": 1
+      }
+    ]
+  },
+  "time": {"from": "now-6h", "to": "now"}
+}

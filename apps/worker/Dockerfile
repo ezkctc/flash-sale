@@ -23,12 +23,12 @@ FROM node:20-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 
-# Install only pruned, production dependencies
-COPY --from=build /app/pruned/package*.json ./
+# Install production dependencies (use root package.json from deps stage)
+COPY --from=deps /app/package*.json ./
 RUN npm ci --omit=dev
 
-# Copy the built worker dist
-COPY --from=build /app/dist/apps/worker ./dist/apps/worker
+# Copy the built worker dist (Nx outputs to apps/worker/dist)
+COPY --from=build /app/apps/worker/dist ./dist/apps/worker
 
 # Run as non-root for safety
 USER node

@@ -1,0 +1,19 @@
+{
+  "version": 2,
+  "outputCapture": "for-each-task",
+  "title": "K6 Run Executor",
+  "description": "Runs a k6 load test via Docker, pushing results to Prometheus.",
+  "type": "object",
+  "properties": {
+    "script": {
+      "type": "string",
+      "description": "Path to the k6 JavaScript file (e.g., tests/load/smoke-test.js)",
+      "x-prompt": "What is the path to your k6 script?"
+    },
+    "options": {
+      "type": "string",
+      "description": "Additional k6 options to pass (e.g., --vus 5 --duration 30s)"
+    }
+  },
+  "required": ["script"]
+}

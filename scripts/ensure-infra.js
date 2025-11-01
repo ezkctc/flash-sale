@@ -146,6 +146,7 @@ async function ensureService({ service, containerName, host, port }) {
 }
 
 (async () => {
+  // --- Database/Cache Services ---
   await ensureService({
     service: 'redis',
     containerName: 'flash-sale-redis',
@@ -158,5 +159,20 @@ async function ensureService({ service, containerName, host, port }) {
     containerName: 'flash-sale-mongo',
     host: '127.0.0.1',
     port: 27017,
+  });
+
+  // --- Monitoring Services  ---
+  await ensureService({
+    service: 'prometheus',
+    containerName: 'flash-sale-prometheus',
+    host: '127.0.0.1',
+    port: 9090, // Prometheus Web UI Port
+  });
+
+  await ensureService({
+    service: 'grafana',
+    containerName: 'flash-sale-grafana',
+    host: '127.0.0.1',
+    port: 3000, // Grafana Web UI Port
   });
 })();

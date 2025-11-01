@@ -16,20 +16,20 @@ import { FlashSaleShape } from '@flash-sale/shared-types';
 interface AnalyticsData {
   totalSales: number;
   totalOrders: number;
-  totalRevenue: number;
   activeSales: number;
   recentOrders: any[];
   topSales: FlashSaleShape[];
+  timeToNextSale: string;
 }
 
 export function AnalyticsDashboard() {
   const [data, setData] = useState<AnalyticsData>({
     totalSales: 0,
     totalOrders: 0,
-    totalRevenue: 0,
     activeSales: 0,
     recentOrders: [],
     topSales: [],
+    timeToNextSale: 'N/A',
   });
   const [loading, setLoading] = useState(false);
 
@@ -56,9 +56,27 @@ export function AnalyticsDashboard() {
         return start <= now && now <= end;
       }).length;
 
-      const totalRevenue = orders
-        .filter((order) => order.paymentStatus === 'paid')
-        .reduce((sum, order) => sum + (order.totalAmount || 0), 0);
+      // Time to next sale (next upcoming by startsAt)
+      const upcoming = sales
+        .map((s) => ({ ...s, starts: new Date(s.startsAt) }))
+        .filter((s) => s.starts > now)
+        .sort((a, b) => a.starts.getTime() - b.starts.getTime());
+
+      const formatDuration = (ms: number) => {
+        if (ms <= 0) return '0m 0s';
+        const totalSeconds = Math.floor(ms / 1000);
+        const days = Math.floor(totalSeconds / 86400);
+        const hours = Math.floor((totalSeconds % 86400) / 3600);
+        const minutes = Math.floor((totalSeconds % 3600) / 60);
+        const seconds = totalSeconds % 60;
+        if (days > 0) return `${days}d ${hours}h ${minutes}m`;
+        if (hours > 0) return `${hours}h ${minutes}m ${seconds}s`;
+        return `${minutes}m ${seconds}s`;
+      };
+
+      const timeToNextSale = upcoming.length
+        ? formatDuration(upcoming[0].starts.getTime() - now.getTime())
+        : 'N/A';
 
       const paidOrders = orders.filter(
         (order) => order.paymentStatus === 'paid'
@@ -77,10 +95,10 @@ export function AnalyticsDashboard() {
       setData({
         totalSales: sales.length,
         totalOrders: paidOrders,
-        totalRevenue,
         activeSales,
         recentOrders: orders.slice(0, 5),
         topSales,
+        timeToNextSale,
       });
     } catch (error: any) {
       toast.error('Failed to load analytics');
@@ -222,10 +240,9 @@ export function AnalyticsDashboard() {
         <Col span={6}>
           <Card>
             <Statistic
-              title="Total Revenue"
-              value={data.totalRevenue}
-              prefix={<DollarOutlined />}
-              precision={2}
+              title="Time to Next Sale"
+              value={data.timeToNextSale}
+              prefix={<ClockCircleOutlined />}
               valueStyle={{ color: '#13c2c2' }}
             />
           </Card>

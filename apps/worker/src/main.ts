@@ -4,6 +4,7 @@ import { Redis } from 'ioredis';
 import mongoose, { Types } from 'mongoose';
 import { flashSaleMongoModel, FlashSaleStatus } from '@flash-sale/shared-types';
 import { zsetKey, holdKey, consumedKey } from '@flash-sale/shared-utils';
+import { startMetricsServer } from './metrics-server';
 
 export const REDIS_URL =
   process.env.REDIS_URL ?? 'redis://:redispass@localhost:6379';
@@ -14,9 +15,18 @@ export const QUEUE_NAME = process.env.QUEUE_NAME ?? 'sale-processing-queue';
 export const BULL_PREFIX = process.env.BULLMQ_PREFIX ?? 'flashsale';
 export const HOLD_TTL_SECONDS = Number(process.env.HOLD_TTL_SECONDS ?? 900);
 
+export const FAST_PASS_PERCENT = Number(process.env.FAST_PASS_PERCENT ?? 1);
+
+export const CRITICAL_LOCK_TTL_MS = Number(
+  process.env.CRITICAL_LOCK_TTL_MS ?? 750
+);
+
+export const WORKER_CONCURRENCY = Number(process.env.WORKER_CONCURRENCY ?? 10);
+
 export const RETRY_NOT_YET_ACTIVE = new Error('RETRY_NOT_YET_ACTIVE');
 export const RETRY_NOT_FIRST = new Error('RETRY_NOT_FIRST');
 export const RETRY_NO_STOCK = new Error('RETRY_NO_STOCK');
+export const RETRY_LOCK_BUSY = new Error('RETRY_LOCK_BUSY');
 
 export const saleCacheKey = (saleId: string) => `fsmeta:${saleId}`;
 export const invKey = (saleId: string) => `fsinv:${saleId}`;
@@ -121,18 +131,31 @@ export function createProcessors(redis: Redis, queue: Queue) {
     const lockRes = await withLock(
       redis,
       lockKey(flashSaleId),
-      5000,
+      CRITICAL_LOCK_TTL_MS,
       async () => {
-        const rank = await redis.zrank(qKey, email);
-        if (rank !== 0) throw RETRY_NOT_FIRST;
-
-        const initInv = Number(saleMeta.startingQuantity ?? 0);
+        const initInv = Number(
+          saleMeta.currentQuantity ?? saleMeta.startingQuantity ?? 0
+        );
         await (redis as any).set(invKey(flashSaleId), String(initInv), 'NX');
         const curStock = parseInt(
           (await redis.get(invKey(flashSaleId))) ?? '0',
           10
         );
-        if (curStock <= 0) throw RETRY_NO_STOCK;
+        if (curStock <= 0) {
+          await redis.zrem(qKey, email);
+          throw RETRY_NO_STOCK;
+        }
+
+        const threshold = Math.max(
+          1,
+          Math.ceil(initInv * (FAST_PASS_PERCENT / 100))
+        );
+
+        if (curStock <= threshold) {
+          const head = await redis.zrange(qKey, 0, 0);
+          const headEmail = head?.[0] ?? null;
+          if (headEmail !== email) throw RETRY_NOT_FIRST;
+        }
 
         await redis.decr(invKey(flashSaleId));
         const holdTime = Math.max(1, Number(holdTtlSec) || HOLD_TTL_SECONDS);
@@ -162,7 +185,7 @@ export function createProcessors(redis: Redis, queue: Queue) {
       (lockRes as any)?.ok === false &&
       (lockRes as any)?.reason === 'lock_busy'
     ) {
-      throw RETRY_NOT_FIRST;
+      throw RETRY_LOCK_BUSY;
     }
     return lockRes;
   }
@@ -179,7 +202,7 @@ export function createProcessors(redis: Redis, queue: Queue) {
     const lockRes = await withLock(
       redis,
       lockKey(flashSaleId),
-      5000,
+      CRITICAL_LOCK_TTL_MS,
       async () => {
         const hk = holdKey(flashSaleId, email);
         const ck = consumedKey(flashSaleId, email);
@@ -275,10 +298,12 @@ export async function startWorker() {
     {
       connection: { url: REDIS_URL },
       prefix: BULL_PREFIX,
-      concurrency: 8,
+      concurrency: WORKER_CONCURRENCY,
       lockDuration: 30_000,
     }
   );
+
+  await startMetricsServer();
 
   worker.on('active', (j) =>
     console.log(

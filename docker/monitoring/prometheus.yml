@@ -1,0 +1,28 @@
+global:
+  # Scrape targets every 5 seconds for stress tests.
+  scrape_interval: 5s
+  evaluation_interval: 5s
+  # Attach these labels to all metrics.
+  external_labels:
+    monitor: 'flash-sale-monitor'
+
+rule_files:
+  - /etc/prometheus/rules/*.yml
+
+scrape_configs:
+  # Job to scrape the Prometheus server itself (for diagnostics)
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['prometheus:9090']
+
+  # Job to scrape the Fastify API (api container)
+  - job_name: 'flash-sale-api'
+    static_configs:
+      - targets: ['api:4000']
+    metrics_path: /metrics
+
+  # Job to scrape the BullMQ Worker (worker container)
+  - job_name: 'flash-sale-worker'
+    static_configs:
+      - targets: ['worker:4001']
+    metrics_path: /metrics
