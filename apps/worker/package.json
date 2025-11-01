@@ -95,6 +95,25 @@
           }
         }
       }
+      ,
+      "k6-test": {
+        "executor": "@flash-sale/tools:k6-run",
+        "options": {
+          "script": "tools/k6/api-smoke.js"
+        }
+      },
+      "k6-stress": {
+        "executor": "@flash-sale/tools:k6-run",
+        "options": {
+          "script": "tools/k6/api-stress.js"
+        }
+      },
+      "k6-soak": {
+        "executor": "@flash-sale/tools:k6-run",
+        "options": {
+          "script": "tools/k6/api-soak.js"
+        }
+      }
     }
   },
   "dependencies": {}

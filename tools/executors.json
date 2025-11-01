@@ -1,0 +1,12 @@
+{
+  "$schema": "node_modules/nx/schemas/executors-schema.json",
+  "builders": {},
+  "executors": {
+    "k6-run": {
+      "implementation": "./src/executors/k6-run/executor.ts",
+      "schema": "./src/executors/k6-run/schema.json",
+      "description": "Runs a k6 load test using Docker container."
+    }
+  }
+}
+
