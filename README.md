@@ -710,7 +710,6 @@ POST /api/auth/sign-up/email
 | **MONGODB_URI** | mongodb://root:example@localhost:27017/flash_sale_db?authSource=admin | Full MongoDB connection string with credentials, host, port, database name, and auth source. |
 | **MONGODB_URL** | mongodb://mongo:27017                                                 | Alternative MongoDB URL (without credentials). Used in Docker setup.                         |
 | **MONGO_DB**    | flash_sale_db                                                         | Name of the MongoDB database to use. Auto-derived from MONGODB_URI if provided.              |
-| **MONGO_URL**   | -                                                                     | Legacy alias for MONGODB_URI. If set, overrides other MongoDB settings.                      |
 
 ---
 
@@ -908,6 +907,7 @@ npm run k6:flash -- --options="--env API_BASE=http://host.docker.internal:4000"
 
 **Dashboards:**
 
+- The Queue dashboard in admin
 - [Grafana](http://localhost:3000) is used to visualize metrics from **k6**, the **API**, the **Worker**, and **BullMQ**.
 
 **Expected Results:**
@@ -979,7 +979,7 @@ npm run k6:flash -- --options="--env API_BASE=http://host.docker.internal:4000"
 
 #### What This Means
 
-Your flash sale system successfully handled **massive concurrent traffic** (2,000 simultaneous users competing for 100 items), processed all successful purchases **without overselling or request failures**, and maintained **sub-second response times** under extreme load.
+The flash sale system successfully handled **massive concurrent traffic** (2,000 simultaneous users competing for 100 items), processed all successful purchases **without overselling or request failures**, and maintained **sub-second response times** under extreme load.
 
 The high number of “give-ups” is **expected and healthy** — it shows that the queue and hold system correctly enforced fairness and prevented overselling once inventory ran out.
 
